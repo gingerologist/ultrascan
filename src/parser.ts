@@ -98,7 +98,9 @@ export interface ScanConfig {
   export class UltrasonicDataParser {
     private buffer: Uint8Array = new Uint8Array(0);
     private currentScan: ScanData | null = null;
+    private completedScan: ScanData | null = null; // For auto mode - keep last completed scan
     private scans: Map<string, ScanData> = new Map(); // key: "bootId_scanId"
+    private triggerMode: 'auto' | 'single' = 'auto';
     
     // Callbacks for events
     public onMetadataReceived?: (metadata: MetadataPacket) => void;
@@ -350,6 +352,11 @@ export interface ScanConfig {
           this.onDeviceReboot?.(packet.bootId, this.currentScan.bootId);
         }
         
+        // In single mode, clear previous scan when starting new one
+        if (this.triggerMode === 'single') {
+          this.completedScan = null;
+        }
+        
         this.currentScan = {
           bootId: packet.bootId,
           scanId: packet.scanId,
@@ -391,6 +398,13 @@ export interface ScanConfig {
       
       if (scan.dataPackets.size >= expectedPackets) {
         scan.isComplete = true;
+        
+        // In auto mode, move current scan to completed and prepare for next
+        if (this.triggerMode === 'auto') {
+          this.completedScan = scan;
+        }
+        // In single mode, just mark as complete (no buffering needed)
+        
         this.onScanComplete?.(scan);
       }
     }
@@ -415,8 +429,32 @@ export interface ScanConfig {
     }
   
     // Utility methods
+    public setTriggerMode(mode: 'auto' | 'single'): void {
+      this.triggerMode = mode;
+      
+      // When switching to single mode, clear completed scan buffer
+      if (mode === 'single') {
+        this.completedScan = null;
+      }
+    }
+  
     public getCurrentScan(): ScanData | null {
       return this.currentScan;
+    }
+  
+    public getCompletedScan(): ScanData | null {
+      return this.completedScan;
+    }
+  
+    public getDisplayScan(): ScanData | null {
+      // Return the appropriate scan for display based on mode
+      if (this.triggerMode === 'auto') {
+        // In auto mode, prefer completed scan, fallback to current if receiving
+        return this.completedScan || this.currentScan;
+      } else {
+        // In single mode, show current scan (which becomes completed when done)
+        return this.currentScan;
+      }
     }
   
     public getScan(bootId: number, scanId: number): ScanData | null {
@@ -436,4 +474,13 @@ export interface ScanConfig {
         }
       }
     }
+  
+    public reset(): void {
+      // Clear all scan data - useful when switching modes or reconnecting
+      this.currentScan = null;
+      this.completedScan = null;
+      this.scans.clear();
+      this.buffer = new Uint8Array(0);
+    }
   }
+  

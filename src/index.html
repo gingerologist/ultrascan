@@ -258,22 +258,10 @@
             <button id="disconnectButton" disabled>Disconnect</button>
         </div>
         
-        <!-- Trigger Mode Controls -->
+        <!-- Single Mode Controls (Auto mode temporarily disabled) -->
         <div class="control-row">
             <div class="control-group">
-                <label>Trigger Mode:</label>
-                <div class="mode-selection">
-                    <label>
-                        <input type="radio" name="triggerMode" value="auto" checked>
-                        Auto
-                    </label>
-                    <label>
-                        <input type="radio" name="triggerMode" value="single">
-                        Single
-                    </label>
-                </div>
-            </div>
-            <div class="trigger-controls">
+                <label>Mode: Single Trigger</label>
                 <button id="runStopButton" class="run-stop-btn stopped" disabled>RUN</button>
             </div>
         </div>
@@ -322,6 +310,34 @@
         <div id="scanResult" class="scan-result waiting">
             Waiting for scan data...
         </div>
+
+        <!-- ADD THESE MISSING ELEMENTS: -->
+        
+        <!-- Scan Configuration Display -->
+        <div id="scanConfigDisplay" class="scan-config-display" style="display: none;">
+            <h4>Scan Configuration</h4>
+            <div id="scanConfigText">No scan data available</div>
+        </div>
+        
+        <!-- Chart Controls -->
+        <div id="chartControlsContainer" class="chart-controls" style="display: none;">
+            <div class="control-group">
+                <label>Angle:</label>
+                <select id="angleSelect">
+                    <option value="0">Angle 0</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Step:</label>
+                <select id="stepSelect">
+                    <option value="0">Step 0</option>
+                </select>
+            </div>
+            <button id="updateChartButton">Update Chart</button>
+        </div>
+        
+        <!-- ECharts Container (THIS IS THE MISSING ONE) -->
+        <div id="chartContainer" class="chart-container" style="display: none;"></div>        
     </div>
     
     <div class="info">
@@ -337,6 +353,7 @@
     <script>
         // This will be replaced with the integrated JavaScript
         console.log('Ultrasonic Scanner Interface loaded');
+        /*
         
         // Placeholder for the integrated SerialPortManager and UltrasonicDataParser
         class UltrasonicScannerInterface {
@@ -534,7 +551,7 @@
                     status.className = 'status error';
                 }
             }
-        });
+        }); */
     </script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 export {}; // Make this file a module
 
-// Import the parser
+// Import the parser and ECharts
 import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
+import * as echarts from 'echarts';
 
 // Web Serial API type definitions
 declare global {
@@ -40,7 +41,6 @@ declare global {
 }
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
-type TriggerMode = 'auto' | 'single';
 
 class UltrasonicScannerInterface {
   // Serial port management
@@ -49,8 +49,7 @@ class UltrasonicScannerInterface {
   private disconnectButton: HTMLButtonElement;
   private connectionStatus: HTMLElement;
   
-  // Trigger controls
-  private triggerModeRadios: NodeListOf<HTMLInputElement>;
+  // Single mode controls
   private runStopButton: HTMLButtonElement;
   
   // Display elements
@@ -64,6 +63,15 @@ class UltrasonicScannerInterface {
   private scanResult: HTMLElement;
   private scanCounter: HTMLElement;
   
+  // Chart elements
+  private angleSelect: HTMLSelectElement;
+  private stepSelect: HTMLSelectElement;
+  private updateChartButton: HTMLButtonElement;
+  private chartContainer: HTMLElement;
+  private chartControlsContainer: HTMLElement;
+  private scanConfigDisplay: HTMLElement;
+  private scanConfigText: HTMLElement;
+  
   // State
   private availablePorts: SerialPort[] = [];
   private selectedPort: SerialPort | null = null;
@@ -72,22 +80,43 @@ class UltrasonicScannerInterface {
   private pollingTimer: number | null = null;
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   
-  // Parser and trigger mode
+  // Parser and data
   private dataParser: UltrasonicDataParser;
-  private triggerMode: TriggerMode = 'auto';
   private isRunning: boolean = false;
   private scanCount: number = 0;
-  private currentScanData: ScanData | null = null;
+  private displayScanData: ScanData | null = null;
   private waitingForScan: boolean = false;
+  
+  // Chart instance
+  private chart: any = null;
 
   constructor() {
-    // Get DOM elements with null checks
+
+    console.log('🚀 Constructor: isRunning initial value =', this.isRunning);
+
+    this.initializeElements();
+    this.initializeParser();
+    this.initializeEventListeners();
+    this.initializeChart();
+    this.startPortPolling();
+    this.updateUI();
+
+    setTimeout(() => {
+      console.log('🔍 RUN button status:', {
+        exists: !!this.runStopButton,
+        visible: this.runStopButton?.style.display,
+        disabled: this.runStopButton?.disabled,
+        text: this.runStopButton?.textContent
+      });
+    }, 1000);
+  }
+
+  private initializeElements(): void {
+    // Get all DOM elements
     this.portSelect = document.getElementById('portSelect') as HTMLSelectElement;
     this.connectButton = document.getElementById('connectButton') as HTMLButtonElement;
     this.disconnectButton = document.getElementById('disconnectButton') as HTMLButtonElement;
     this.connectionStatus = document.getElementById('connectionStatus') as HTMLElement;
-    
-    this.triggerModeRadios = document.querySelectorAll('input[name="triggerMode"]') as NodeListOf<HTMLInputElement>;
     this.runStopButton = document.getElementById('runStopButton') as HTMLButtonElement;
     
     this.bootIdEl = document.getElementById('bootId') as HTMLElement;
@@ -99,57 +128,56 @@ class UltrasonicScannerInterface {
     this.progressFill = document.getElementById('progressFill') as HTMLElement;
     this.scanResult = document.getElementById('scanResult') as HTMLElement;
     this.scanCounter = document.getElementById('scanCounter') as HTMLElement;
-
-    // Check if all required elements were found
-    if (!this.portSelect || !this.connectButton || !this.disconnectButton || !this.connectionStatus ||
-        !this.runStopButton || !this.bootIdEl || !this.scanIdEl || !this.scanNameEl || 
-        !this.numAnglesEl || !this.dataPacketCountEl || !this.expectedPacketsEl || 
-        !this.progressFill || !this.scanResult || !this.scanCounter) {
-      console.error('Required elements not found:', {
-        portSelect: !!this.portSelect,
-        connectButton: !!this.connectButton,
-        disconnectButton: !!this.disconnectButton,
-        connectionStatus: !!this.connectionStatus,
-        runStopButton: !!this.runStopButton,
-        bootIdEl: !!this.bootIdEl,
-        scanIdEl: !!this.scanIdEl,
-        scanNameEl: !!this.scanNameEl,
-        numAnglesEl: !!this.numAnglesEl,
-        dataPacketCountEl: !!this.dataPacketCountEl,
-        expectedPacketsEl: !!this.expectedPacketsEl,
-        progressFill: !!this.progressFill,
-        scanResult: !!this.scanResult,
-        scanCounter: !!this.scanCounter
-      });
-      return;
-    }
-
-    // Initialize parser
-    this.dataParser = new UltrasonicDataParser();
-    this.setupParserCallbacks();
     
-    this.initializeEventListeners();
-    this.startPortPolling();
-    this.updateUI();
-    this.updateScanDisplay();
+    this.angleSelect = document.getElementById('angleSelect') as HTMLSelectElement;
+    this.stepSelect = document.getElementById('stepSelect') as HTMLSelectElement;
+    this.updateChartButton = document.getElementById('updateChartButton') as HTMLButtonElement;
+    this.chartContainer = document.getElementById('chartContainer') as HTMLElement;
+    this.chartControlsContainer = document.getElementById('chartControlsContainer') as HTMLElement;
+    this.scanConfigDisplay = document.getElementById('scanConfigDisplay') as HTMLElement;
+    this.scanConfigText = document.getElementById('scanConfigText') as HTMLElement;
+
+    // Check core elements
+    const missingElements: string[] = [];
+    
+    if (!this.portSelect) missingElements.push('portSelect');
+    if (!this.connectButton) missingElements.push('connectButton');
+    if (!this.disconnectButton) missingElements.push('disconnectButton');
+    if (!this.connectionStatus) missingElements.push('connectionStatus');
+    if (!this.runStopButton) missingElements.push('runStopButton');
+    if (!this.chartContainer) missingElements.push('chartContainer');
+    
+    if (missingElements.length > 0) {
+      console.error('Missing HTML elements:', missingElements.join(', '));
+      console.log('Element status:');
+      console.log('- portSelect:', !!this.portSelect);
+      console.log('- connectButton:', !!this.connectButton);
+      console.log('- disconnectButton:', !!this.disconnectButton);
+      console.log('- connectionStatus:', !!this.connectionStatus);
+      console.log('- runStopButton:', !!this.runStopButton);
+      console.log('- chartContainer:', !!this.chartContainer);
+    }
   }
 
-  private setupParserCallbacks(): void {
+  private initializeParser(): void {
+    this.dataParser = new UltrasonicDataParser();
+    this.dataParser.setTriggerMode('single');
+    
     this.dataParser.onMetadataReceived = (metadata: MetadataPacket) => {
-      this.onMetadataReceived(metadata);
+      this.handleMetadataReceived(metadata);
     };
 
     this.dataParser.onDataPacketReceived = (packet: DataPacket) => {
-      this.onDataPacketReceived(packet);
+      this.handleDataPacketReceived(packet);
     };
 
     this.dataParser.onScanComplete = (scan: ScanData) => {
-      this.onScanComplete(scan);
+      this.handleScanComplete(scan);
     };
 
     this.dataParser.onDeviceReboot = (newBootId: number, oldBootId: number) => {
-      console.log(`Device rebooted: ${oldBootId.toString(16)} -> ${newBootId.toString(16)}`);
-      this.setConnectionStatus('Device rebooted - new session started', 'connected');
+      console.log(`Device rebooted: 0x${oldBootId.toString(16)} -> 0x${newBootId.toString(16)}`);
+      this.setConnectionStatus('Device rebooted', 'connected');
     };
 
     this.dataParser.onParseError = (error: string, data: Uint8Array) => {
@@ -159,33 +187,58 @@ class UltrasonicScannerInterface {
   }
 
   private initializeEventListeners(): void {
-    // Serial port events
-    this.portSelect.addEventListener('change', () => {
-      const selectedIndex = parseInt(this.portSelect.value);
-      this.selectedPort = isNaN(selectedIndex) ? null : this.availablePorts[selectedIndex];
-      console.log('Port selected:', this.selectedPort?.getInfo());
-      this.updateUI();
-    });
-
-    this.connectButton.addEventListener('click', () => {
-      this.connectToSelectedPort();
-    });
-
-    this.disconnectButton.addEventListener('click', () => {
-      this.disconnectPort();
-    });
-
-    // Trigger mode events
-    this.triggerModeRadios.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        this.triggerMode = (e.target as HTMLInputElement).value as TriggerMode;
-        this.updateTriggerControls();
+    // Serial port controls
+    if (this.portSelect) {
+      this.portSelect.addEventListener('change', () => {
+        const selectedIndex = parseInt(this.portSelect.value);
+        this.selectedPort = isNaN(selectedIndex) ? null : this.availablePorts[selectedIndex];
+        this.updateUI();
       });
-    });
+    }
 
-    this.runStopButton.addEventListener('click', () => {
-      this.toggleRunStop();
-    });
+    if (this.connectButton) {
+      this.connectButton.addEventListener('click', () => {
+        this.connectToSelectedPort();
+      });
+    }
+
+    if (this.disconnectButton) {
+      this.disconnectButton.addEventListener('click', () => {
+        this.disconnectPort();
+      });
+    }
+
+    if (this.runStopButton) {
+      this.runStopButton.addEventListener('click', () => {
+        console.log('🖱️ CLICK: isRunning BEFORE toggle =', this.isRunning);
+        this.toggleRunStop();
+        console.log('🖱️ CLICK: isRunning AFTER toggle =', this.isRunning);
+      });
+    }
+
+    // Chart controls
+    if (this.updateChartButton) {
+      this.updateChartButton.addEventListener('click', () => {
+        this.updateChart();
+      });
+    }
+
+    if (this.angleSelect) {
+      this.angleSelect.addEventListener('change', () => {
+        this.updateChart();
+      });
+    }
+
+    if (this.stepSelect) {
+      this.stepSelect.addEventListener('change', () => {
+        this.updateChart();
+      });
+    }
+  }
+
+  private initializeChart(): void {
+    // Don't initialize chart immediately since container is hidden
+    // Chart will be initialized when first needed in showChartControls()
   }
 
   private startPortPolling(): void {
@@ -205,7 +258,6 @@ class UltrasonicScannerInterface {
       const ports = await navigator.serial.getPorts();
       
       if (this.hasPortListChanged(ports)) {
-        console.log('Port list changed. New ports:', ports.length);
         this.availablePorts = ports;
         this.updatePortDropdown();
         
@@ -215,7 +267,6 @@ class UltrasonicScannerInterface {
           );
           
           if (!stillExists) {
-            console.log('Connected port was removed, auto-disconnecting');
             this.handlePortRemoved();
           }
         }
@@ -243,6 +294,8 @@ class UltrasonicScannerInterface {
   }
 
   private updatePortDropdown(): void {
+    if (!this.portSelect) return;
+
     const currentSelection = this.portSelect.value;
     this.portSelect.innerHTML = '';
     
@@ -279,7 +332,6 @@ class UltrasonicScannerInterface {
 
   private getPortDisplayName(port: SerialPort): string {
     const info = port.getInfo();
-    
     let displayName = 'Serial Port';
     
     if (info.usbVendorId && info.usbProductId) {
@@ -327,22 +379,16 @@ class UltrasonicScannerInterface {
 
       this.connectedPort = this.selectedPort;
       this.connectionState = 'connected';
+
+      // ADD THIS DEBUG:
+      console.log('🔗 After connection: isRunning =', this.isRunning);
+
       this.setConnectionStatus(`Connected to ${this.getPortDisplayName(this.connectedPort)}`, 'connected');
       
-      console.log('Successfully connected to port:', this.connectedPort.getInfo());
-      
-      // Start reading data
+      console.log('🔗 About to start data reading...'); // ADD THIS
       this.startDataReading();
-      
-      // Enable trigger controls
-      this.updateTriggerControls();
-      
-      // Auto-start in auto mode
-      if (this.triggerMode === 'auto') {
-        this.isRunning = true;
-        this.waitingForScan = true;
-        this.updateScanDisplay('waiting', 'Waiting for scan data...');
-      }
+      console.log('🔗 startDataReading() call completed'); // ADD THIS
+      this.updateUI();
       
     } catch (error) {
       console.error('Connection error:', error);
@@ -353,12 +399,9 @@ class UltrasonicScannerInterface {
         if (this.connectionState === 'error') {
           this.connectionState = 'disconnected';
           this.updateUI();
-          this.setConnectionStatus('Connection failed', 'error');
         }
       }, 2000);
     }
-    
-    this.updateUI();
   }
 
   private async startDataReading(): Promise<void> {
@@ -368,19 +411,27 @@ class UltrasonicScannerInterface {
 
     try {
       this.reader = this.connectedPort.readable.getReader();
-      
-      while (this.reader && this.connectionState === 'connected') {
-        const { value, done } = await this.reader.read();
-        
-        if (done) {
-          console.log('Data stream ended');
-          break;
+      try {
+        while (this.reader && this.connectionState === 'connected') {
+          console.log('🔄 About to read from serial port...');
+          const { value, done } = await this.reader.read();
+          
+          if (done) {
+            console.log('❌ Data stream ended - connection closed');
+            break;
+          }
+
+          console.log('📦 Raw data received:', value.length, 'bytes');
+          console.log('🏃 isRunning:', this.isRunning);        
+          
+          if (this.isRunning) {
+            this.dataParser.processData(value);
+          }
         }
-        
-        // Only process data if we're in a mode that accepts it
-        if (this.shouldProcessData()) {
-          this.dataParser.processData(value);
-        }
+      } catch (loopError) {
+        console.error('💥 Error in read loop:', loopError);
+        // break;
+        this.connectionState = 'error';
       }
     } catch (error) {
       if ((error as Error).name !== 'NetworkError') {
@@ -395,29 +446,16 @@ class UltrasonicScannerInterface {
     }
   }
 
-  private shouldProcessData(): boolean {
-    if (this.triggerMode === 'auto') {
-      return true; // Always process in auto mode
-    } else {
-      return this.isRunning; // Only process in single mode when running
-    }
-  }
-
   private async disconnectPort(): Promise<void> {
-    if (!this.connectedPort) {
-      return;
-    }
+    if (!this.connectedPort) return;
 
     try {
-      // Stop data reading
       if (this.reader) {
         await this.reader.cancel();
         this.reader = null;
       }
       
-      // Close port
       await this.connectedPort.close();
-      console.log('Port disconnected successfully');
     } catch (error) {
       console.error('Error disconnecting port:', error);
     }
@@ -426,11 +464,12 @@ class UltrasonicScannerInterface {
     this.connectionState = 'disconnected';
     this.isRunning = false;
     this.waitingForScan = false;
-    this.currentScanData = null;
+    this.displayScanData = null;
     
+    this.dataParser.reset();
     this.setConnectionStatus('Disconnected', 'disconnected');
     this.updateUI();
-    this.updateScanDisplay('waiting', 'Waiting for connection...');
+    this.updateScanDisplay();
   }
 
   private handlePortRemoved(): void {
@@ -438,11 +477,11 @@ class UltrasonicScannerInterface {
     this.connectionState = 'disconnected';
     this.isRunning = false;
     this.waitingForScan = false;
-    this.currentScanData = null;
+    this.displayScanData = null;
     
     this.setConnectionStatus('Device was unplugged', 'error');
     this.updateUI();
-    this.updateScanDisplay('bad', 'Device disconnected');
+    this.updateScanDisplay();
     
     setTimeout(() => {
       if (this.connectionState === 'disconnected') {
@@ -451,57 +490,50 @@ class UltrasonicScannerInterface {
     }, 3000);
   }
 
-  // Trigger mode controls
-  private updateTriggerControls(): void {
-    const isConnected = this.connectionState === 'connected';
+  private toggleRunStop(): void {
+    this.isRunning = !this.isRunning;
+    this.updateRunStopButton();
     
-    if (this.triggerMode === 'auto') {
-      // In auto mode, hide run/stop button and auto-start
-      if (this.runStopButton) {
-        this.runStopButton.style.display = 'none';
-      }
-      if (isConnected) {
-        this.isRunning = true;
-        this.waitingForScan = true;
-      }
+    if (this.isRunning) {
+      this.startSingleCapture();
     } else {
-      // In single mode, show run/stop button
-      if (this.runStopButton) {
-        this.runStopButton.style.display = 'block';
-        this.runStopButton.disabled = !isConnected;
-        this.updateRunStopButton();
-      }
+      this.stopCapture();
     }
   }
-
   private updateRunStopButton(): void {
+    console.log('🎨 updateRunStopButton called: isRunning =', this.isRunning);
+    console.trace('🎨 Call stack:');
+    console.log('🎨 runStopButton exists:', !!this.runStopButton);
+    
     if (!this.runStopButton) return;
     
     if (this.isRunning) {
+      console.log('🎨 Setting button to STOP (red)');
       this.runStopButton.textContent = 'STOP';
       this.runStopButton.className = 'run-stop-btn running';
     } else {
+      console.log('🎨 Setting button to RUN (green)');
       this.runStopButton.textContent = 'RUN';
       this.runStopButton.className = 'run-stop-btn stopped';
     }
+    
+    console.log('🎨 Button text after update:', this.runStopButton.textContent);
   }
 
-  private toggleRunStop(): void {
-    if (this.triggerMode === 'single') {
-      this.isRunning = !this.isRunning;
-      this.updateRunStopButton();
-      
-      if (this.isRunning) {
-        this.startSingleCapture();
-      } else {
-        this.stopCapture();
-      }
-    }
-  }
+  // private updateRunStopButton(): void {
+  //   if (!this.runStopButton) return;
+    
+  //   if (this.isRunning) {
+  //     this.runStopButton.textContent = 'STOP';
+  //     this.runStopButton.className = 'run-stop-btn running';
+  //   } else {
+  //     this.runStopButton.textContent = 'RUN';
+  //     this.runStopButton.className = 'run-stop-btn stopped';
+  //   }
+  // }
 
   private startSingleCapture(): void {
-    // Reset for new capture
-    this.currentScanData = null;
+    this.displayScanData = null;
     this.waitingForScan = true;
     this.updateScanDisplay('waiting', 'Waiting for scan data...');
   }
@@ -511,96 +543,234 @@ class UltrasonicScannerInterface {
     this.updateScanDisplay('bad', 'Capture stopped by user');
   }
 
-  // Parser event handlers
-  private onMetadataReceived(metadata: MetadataPacket): void {
-    console.log('Metadata received:', metadata);
-    
-    // Only accept metadata if we're waiting for a scan
+  private handleMetadataReceived(metadata: MetadataPacket): void {
     if (!this.waitingForScan) {
       console.log('Ignoring metadata - not waiting for scan');
       return;
     }
     
-    // Start new scan tracking
-    this.currentScanData = {
-      bootId: metadata.bootId,
-      scanId: metadata.scanId,
-      metadata: metadata,
-      dataPackets: new Map(),
-      isComplete: false,
-      timestamp: Date.now()
-    };
-    
     this.updateScanDisplay('waiting', 'Receiving scan data...');
   }
 
-  private onDataPacketReceived(packet: DataPacket): void {
-    if (!this.currentScanData || 
-        packet.bootId !== this.currentScanData.bootId || 
-        packet.scanId !== this.currentScanData.scanId) {
-      // Data packet without matching metadata - ignore
-      console.log('Ignoring orphaned data packet');
-      return;
-    }
-    
-    const dataKey = `${packet.angleIndex}_${packet.stepIndex}_${packet.channelIndex}`;
-    this.currentScanData.dataPackets.set(dataKey, packet);
-    
-    // Update display
+  private handleDataPacketReceived(packet: DataPacket): void {
     this.updateScanDisplay();
   }
 
-  private onScanComplete(scan: ScanData): void {
+  private handleScanComplete(scan: ScanData): void {
     console.log('Scan complete:', scan);
     this.scanCount++;
-    this.currentScanData = scan;
+    this.displayScanData = scan;
+    
+    this.isRunning = false;
+    this.waitingForScan = false;
+    this.updateRunStopButton();
     
     this.updateScanDisplay('good', 'SCAN COMPLETE ✓');
+    this.displayScanConfiguration(scan.metadata.scanConfig);
+    this.populateSelectors(scan.metadata.scanConfig);
+    this.showChartControls();
+    this.updateChart();
+  }
+
+  private displayScanConfiguration(config: any): void {
+    if (!this.scanConfigDisplay || !this.scanConfigText) return;
     
-    // Handle trigger modes
-    if (this.triggerMode === 'single') {
-      // Stop after completing one scan
-      this.isRunning = false;
-      this.waitingForScan = false;
-      this.updateRunStopButton();
-    } else {
-      // In auto mode, automatically wait for next scan
-      this.waitingForScan = true;
-      // Keep the completed scan displayed but be ready for next one
-      setTimeout(() => {
-        if (this.triggerMode === 'auto' && this.waitingForScan) {
-          this.updateScanDisplay('waiting', 'Waiting for next scan...');
-        }
-      }, 2000);
+    const configText = `Scan Name: ${config.name}
+Angles: ${config.numAngles}
+Pattern Segments: ${config.numPatternSegments}
+Repeat Count: ${config.repeatCount}
+Tail Count: ${config.tailCount}
+TX Start Delay: ${config.txStartDel}
+TR Switch Delay Mode: ${config.trSwDelMode}
+Capture Window: ${config.captureStartUs}μs - ${config.captureEndUs}μs
+Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
+    
+    this.scanConfigText.textContent = configText;
+    this.scanConfigDisplay.style.display = 'block';
+  }
+
+  private populateSelectors(config: any): void {
+    if (this.angleSelect) {
+      this.angleSelect.innerHTML = '';
+      for (let i = 0; i < config.numAngles; i++) {
+        const option = document.createElement('option');
+        option.value = i.toString();
+        option.textContent = `Angle ${i}`;
+        this.angleSelect.appendChild(option);
+      }
+    }
+    
+    if (this.stepSelect) {
+      this.stepSelect.innerHTML = '';
+      for (let i = 0; i < 64; i++) {
+        const option = document.createElement('option');
+        option.value = i.toString();
+        option.textContent = `Step ${i}`;
+        this.stepSelect.appendChild(option);
+      }
     }
   }
 
-  // UI update methods
+  private showChartControls(): void {
+    if (this.chartControlsContainer) {
+      this.chartControlsContainer.style.display = 'flex';
+    }
+    if (this.chartContainer) {
+      this.chartContainer.style.display = 'block';
+    }
+    
+    // Initialize chart now that container is visible
+    this.initializeChartNow();
+  }
+
+  private initializeChartNow(): void {
+    if (!this.chartContainer || this.chart) return; // Already initialized
+
+    this.chart = echarts.init(this.chartContainer);
+
+    const option = {
+      title: {
+        text: 'Ultrasonic Data - 64 Channels',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross'
+        }
+      },
+      legend: {
+        show: false
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '8%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        name: 'Sample Index',
+        nameLocation: 'middle',
+        nameGap: 30
+      },
+      yAxis: {
+        type: 'value',
+        name: 'ADC Value',
+        nameLocation: 'middle',
+        nameGap: 50,
+        min: 0,
+        max: 1023
+      },
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: 0
+        },
+        {
+          type: 'slider',
+          xAxisIndex: 0,
+          height: 20,
+          bottom: 30
+        }
+      ],
+      series: [] as any[]
+    };
+
+    this.chart.setOption(option);
+
+    // Add resize handler
+    window.addEventListener('resize', () => {
+      if (this.chart) {
+        this.chart.resize();
+      }
+    });
+  }
+
+  private updateChart(): void {
+    if (!this.chart || !this.displayScanData || !this.angleSelect || !this.stepSelect) {
+      return;
+    }
+    
+    const angleIndex = parseInt(this.angleSelect.value) || 0;
+    const stepIndex = parseInt(this.stepSelect.value) || 0;
+    
+    const series: any[] = [];
+    let maxSamples = 0;
+    
+    // Create series for each channel
+    for (let channel = 0; channel < 64; channel++) {
+      const dataKey = `${angleIndex}_${stepIndex}_${channel}`;
+      const packet = this.displayScanData.dataPackets.get(dataKey);
+      
+      const hasData = packet && packet.samples && packet.samples.length > 0;
+      const data = hasData ? packet.samples : [];
+      
+      if (hasData) {
+        maxSamples = Math.max(maxSamples, data.length);
+      }
+      
+      series.push({
+        name: `Channel ${channel}`,
+        type: 'line',
+        data: data,
+        symbol: 'none',
+        lineStyle: {
+          width: 1,
+          opacity: hasData ? 0.8 : 0.3
+        },
+        itemStyle: {
+          color: hasData ? this.getChannelColor(channel) : '#cccccc'
+        }
+      });
+    }
+    
+    const xAxisData = Array.from({length: maxSamples}, (_, i) => i);
+    
+    this.chart.setOption({
+      title: {
+        text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex}`
+      },
+      xAxis: {
+        data: xAxisData
+      },
+      series: series
+    });
+  }
+
+  private getChannelColor(channel: number): string {
+    const hue = (channel * 360 / 64) % 360;
+    return `hsl(${hue}, 70%, 50%)`;
+  }
+
   private updateUI(): void {
     const hasSelection = this.selectedPort !== null;
     const isConnected = this.connectionState === 'connected';
     const isConnecting = this.connectionState === 'connecting';
     
-    this.connectButton.disabled = !hasSelection || isConnected || isConnecting;
-    this.disconnectButton.disabled = !isConnected;
-    this.portSelect.disabled = isConnected || isConnecting;
-    
-    // Update trigger controls
-    this.triggerModeRadios.forEach(radio => {
-      radio.disabled = !isConnected;
-    });
-    
-    this.updateTriggerControls();
+    if (this.connectButton) {
+      this.connectButton.disabled = !hasSelection || isConnected || isConnecting;
+    }
+    if (this.disconnectButton) {
+      this.disconnectButton.disabled = !isConnected;
+    }
+    if (this.portSelect) {
+      this.portSelect.disabled = isConnected || isConnecting;
+    }
+    if (this.runStopButton) {
+      this.runStopButton.disabled = !isConnected;
+    }
   }
 
   private updateScanDisplay(status?: 'good' | 'bad' | 'waiting', message?: string): void {
-    // Update scan counter
     if (this.scanCounter) {
       this.scanCounter.textContent = `Scans Received: ${this.scanCount}`;
     }
     
-    if (this.currentScanData) {
-      const scan = this.currentScanData;
+    const scanToDisplay = this.displayScanData || this.dataParser.getDisplayScan();
+    
+    if (scanToDisplay) {
+      const scan = scanToDisplay;
       const metadata = scan.metadata;
       
       if (this.bootIdEl) {
@@ -624,13 +794,11 @@ class UltrasonicScannerInterface {
         this.expectedPacketsEl.textContent = expected.toString();
       }
       
-      // Update progress
       const progress = expected > 0 ? (scan.dataPackets.size / expected) * 100 : 0;
       if (this.progressFill) {
         this.progressFill.style.width = `${progress}%`;
         this.progressFill.textContent = `${Math.round(progress)}%`;
       }
-      
     } else {
       // Clear display
       if (this.bootIdEl) this.bootIdEl.textContent = '-';
@@ -645,7 +813,6 @@ class UltrasonicScannerInterface {
       }
     }
     
-    // Update result status
     if (status && message && this.scanResult) {
       this.scanResult.className = `scan-result ${status}`;
       this.scanResult.textContent = message;
@@ -657,15 +824,6 @@ class UltrasonicScannerInterface {
       this.connectionStatus.textContent = message;
       this.connectionStatus.className = `status ${type}`;
     }
-  }
-
-  // Public methods for testing/debugging
-  public getCurrentScan(): ScanData | null {
-    return this.dataParser.getCurrentScan();
-  }
-
-  public getCompletedScans(): ScanData[] {
-    return this.dataParser.getCompletedScans();
   }
 }
 

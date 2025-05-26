@@ -59,10 +59,11 @@ export interface ScanConfig {
     tailCount: number;               // 0-31
     txStartDel: number;              // 0-511
     trSwDelMode: boolean;            // flag
-    captureStartUs: number;          // 0-500 microseconds
-    captureEndUs: number;            // 0-500 microseconds
+    captureStartUs: number;          // 0-500 microseconds - capture window start
+    captureEndUs: number;            // 0-500 microseconds - capture window end
     angles: any[];                   // 16 angles - structure TBD
     numAngles: number;               // Actual number of angles used
+    // Note: Samples per packet = 20 × (captureEndUs - captureStartUs) due to 20MHz ADC clock
   }
   
   export interface MetadataPacket {
@@ -219,6 +220,17 @@ export interface ScanConfig {
       
       // Unpack 10-bit samples (8 samples per 10 bytes)
       const samples = this.unpack10BitSamples(dataChunk);
+      
+      // Validate sample count if we have scan configuration
+      if (this.currentScan && this.currentScan.metadata) {
+        const config = this.currentScan.metadata.scanConfig;
+        const expectedSamples = 20 * (config.captureEndUs - config.captureStartUs);
+        
+        if (samples.length !== expectedSamples) {
+          console.warn(`Sample count mismatch: expected ${expectedSamples}, got ${samples.length} ` +
+                      `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)`);
+        }
+      }
   
       return {
         packetType: 0x02,
@@ -438,6 +450,34 @@ export interface ScanConfig {
       }
     }
   
+    public getExpectedSamplesPerPacket(): number | null {
+      // Calculate expected samples based on current scan configuration
+      if (this.currentScan && this.currentScan.metadata) {
+        const config = this.currentScan.metadata.scanConfig;
+        return 20 * (config.captureEndUs - config.captureStartUs);
+      }
+      return null;
+    }
+  
+    public getExpectedDataChunkSize(): number | null {
+      // Calculate expected data chunk size in bytes
+      const expectedSamples = this.getExpectedSamplesPerPacket();
+      if (expectedSamples !== null) {
+        // 8 samples per 10 bytes, so bytes = (samples / 8) * 10
+        return Math.ceil(expectedSamples / 8) * 10;
+      }
+      return null;
+    }
+  
+    public getExpectedPacketLength(): number | null {
+      // Calculate expected total packet length
+      const dataChunkSize = this.getExpectedDataChunkSize();
+      if (dataChunkSize !== null) {
+        return 14 + dataChunkSize + 4; // header + data + CRC
+      }
+      return null;
+    }
+  
     public getCurrentScan(): ScanData | null {
       return this.currentScan;
     }
@@ -483,4 +523,3 @@ export interface ScanConfig {
       this.buffer = new Uint8Array(0);
     }
   }
-  

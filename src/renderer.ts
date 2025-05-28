@@ -453,7 +453,6 @@ class UltrasonicScannerInterface {
     }
   }
 
-  // Call cleanup in disconnect method
   private async disconnectPort(): Promise<void> {
     if (!this.connectedPort) return;
 
@@ -611,25 +610,60 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
   }
 
   private populateSelectors(config: any): void {
+    console.log('📊 Populating selectors with config:', config);
+
+    // Populate angles based on actual number of angles
     if (this.angleSelect) {
       this.angleSelect.innerHTML = '';
       for (let i = 0; i < config.numAngles; i++) {
         const option = document.createElement('option');
         option.value = i.toString();
-        option.textContent = `Angle ${i}`;
+
+        // Use label if available, otherwise default naming
+        const label = config.angles[i]?.label || `Angle ${i}`;
+        option.textContent = `${label} (${config.angles[i]?.numSteps || 0} steps)`;
+
         this.angleSelect.appendChild(option);
       }
+
+      // Add change listener to update steps when angle changes
+      this.angleSelect.addEventListener('change', () => {
+        this.updateStepSelector(config);
+      });
     }
 
-    if (this.stepSelect) {
-      this.stepSelect.innerHTML = '';
-      for (let i = 0; i < 64; i++) {
+    // Populate steps based on the first angle initially
+    this.updateStepSelector(config);
+  }
+
+  private updateStepSelector(config: any): void {
+    if (!this.stepSelect || !this.angleSelect) return;
+
+    const selectedAngleIndex = parseInt(this.angleSelect.value) || 0;
+    const selectedAngle = config.angles[selectedAngleIndex];
+    const numSteps = selectedAngle?.numSteps || 0;
+
+    console.log(`📊 Updating step selector for angle ${selectedAngleIndex}: ${numSteps} steps available`);
+
+    this.stepSelect.innerHTML = '';
+
+    if (numSteps === 0) {
+      const option = document.createElement('option');
+      option.value = '0';
+      option.textContent = 'No steps available';
+      option.disabled = true;
+      this.stepSelect.appendChild(option);
+    } else {
+      for (let i = 0; i < numSteps; i++) {
         const option = document.createElement('option');
         option.value = i.toString();
         option.textContent = `Step ${i}`;
         this.stepSelect.appendChild(option);
       }
     }
+
+    // Reset to step 0 when angle changes
+    this.stepSelect.value = '0';
   }
 
   private showChartControls(func: () => void = () => { }): void {
@@ -653,6 +687,9 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       console.log('📊 Container dimensions after forcing:',
         this.chartContainer.getBoundingClientRect().width, 'x',
         this.chartContainer.getBoundingClientRect().height);
+
+      // Test CSS after showing
+      this.testCSSAfterShow();
     }
 
     // Small delay to ensure layout is computed
@@ -832,7 +869,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       return;
     }
 
-    // Check if chart is still valid
     if (this.chart.isDisposed()) {
       console.warn('📊 Chart is disposed, reinitializing...');
       this.chart = null;
@@ -844,6 +880,15 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const stepIndex = parseInt(this.stepSelect.value) || 0;
 
     console.log(`📊 Updating chart for angle ${angleIndex}, step ${stepIndex}`);
+
+    // Debug: Check what data keys are available
+    const availableKeys = Array.from(this.displayScanData.dataPackets.keys());
+    const keysForThisAngleStep = availableKeys.filter(key =>
+      key.startsWith(`${angleIndex}_${stepIndex}_`)
+    );
+
+    console.log(`📊 Available data keys for angle ${angleIndex}, step ${stepIndex}:`, keysForThisAngleStep.length);
+    console.log(`📊 Sample keys:`, keysForThisAngleStep.slice(0, 5));
 
     const series: any[] = [];
     let maxSamples = 0;
@@ -862,20 +907,23 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         channelsWithData++;
       }
 
-      series.push({
-        name: `Channel ${channel}`,
-        type: 'line',
-        data: data,
-        symbol: 'none',
-        lineStyle: {
-          width: hasData ? 1.5 : 1,
-          opacity: hasData ? 0.8 : 0.2
-        },
-        itemStyle: {
-          color: hasData ? this.getChannelColor(channel) : '#e0e0e0'
-        },
-        legendHoverLink: hasData
-      });
+      // Only add series for channels that have data (to improve performance)
+      if (hasData) {
+        series.push({
+          name: `Channel ${channel}`,
+          type: 'line',
+          data: data,
+          symbol: 'none',
+          lineStyle: {
+            width: 1.5,
+            opacity: 0.8
+          },
+          itemStyle: {
+            color: this.getChannelColor(channel)
+          },
+          legendHoverLink: true
+        });
+      }
     }
 
     const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
@@ -883,7 +931,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     console.log(`📊 Chart update: ${channelsWithData}/64 channels have data, max samples: ${maxSamples}`);
 
     try {
-      // Use merge mode (default) instead of notMerge to avoid axis issues
       this.chart.setOption({
         title: {
           text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/64 channels)`
@@ -895,6 +942,11 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       });
 
       console.log('📊 Chart updated successfully');
+
+      // Show warning if no data available
+      if (channelsWithData === 0) {
+        console.warn(`📊 No data available for Angle ${angleIndex}, Step ${stepIndex}`);
+      }
     } catch (error) {
       console.error('📊 Failed to update chart:', error);
     }
@@ -941,8 +993,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       this.runStopButton.disabled = !isConnected;
     }
   }
-
-  // Fixed updateScanDisplay method for renderer.ts
 
   private updateScanDisplay(status?: 'good' | 'bad' | 'waiting', message?: string): void {
     if (this.scanCounter) {
@@ -1037,21 +1087,52 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
   // Also add this CSS verification method
   private verifyCSSLoaded(): void {
     if (this.chartContainer) {
-      // Create a test element to check if CSS is loaded
+      // Test 1: Check if basic CSS is applied
       const testEl = document.createElement('div');
       testEl.id = 'chartContainer';
-      testEl.className = 'chart-visible';
       testEl.style.visibility = 'hidden';
       testEl.style.position = 'absolute';
       testEl.style.top = '-9999px';
       document.body.appendChild(testEl);
 
-      const styles = window.getComputedStyle(testEl);
-      console.log('🎨 CSS Test Results:');
-      console.log('- Test element height:', styles.height);
-      console.log('- Test element display:', styles.display);
+      const styles1 = window.getComputedStyle(testEl);
+      console.log('🎨 CSS Test 1 (hidden):');
+      console.log('- display:', styles1.display);
+      console.log('- height:', styles1.height);
+      console.log('- width:', styles1.width);
+
+      // Test 2: Check if chart-visible class works
+      testEl.classList.add('chart-visible');
+      const styles2 = window.getComputedStyle(testEl);
+      console.log('🎨 CSS Test 2 (chart-visible):');
+      console.log('- display:', styles2.display);
+      console.log('- height:', styles2.height);
+      console.log('- width:', styles2.width);
 
       document.body.removeChild(testEl);
+
+      // Test 3: Check actual chart container styles after forcing
+      console.log('🎨 CSS Test 3 (actual container):');
+      const actualStyles = window.getComputedStyle(this.chartContainer);
+      console.log('- display:', actualStyles.display);
+      console.log('- height:', actualStyles.height);
+      console.log('- width:', actualStyles.width);
+      console.log('- min-height:', actualStyles.minHeight);
+    }
+  }
+
+  // Also add a method to test CSS after showing the chart
+  private testCSSAfterShow(): void {
+    if (this.chartContainer) {
+      console.log('🎨 CSS Test After Show:');
+      const rect = this.chartContainer.getBoundingClientRect();
+      const styles = window.getComputedStyle(this.chartContainer);
+
+      console.log('- getBoundingClientRect:', rect.width, 'x', rect.height);
+      console.log('- computed display:', styles.display);
+      console.log('- computed height:', styles.height);
+      console.log('- computed width:', styles.width);
+      console.log('- has chart-visible class:', this.chartContainer.classList.contains('chart-visible'));
     }
   }
 }

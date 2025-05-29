@@ -733,6 +733,38 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         trigger: 'axis',
         axisPointer: {
           type: 'cross'
+        },
+        padding: 5,
+        textStyle: {
+          fontSize: 9,
+          fontFamily: 'Consolas, Courier New, monospace',
+        },
+        formatter: function (params: any) {
+          if (!params || params.length === 0) return '';
+
+          let html = '';
+
+          // Add header with x-axis value
+          if (params[0].axisValueLabel || params[0].name) {
+            html += '<div style="margin-bottom: 4px; font-weight: bold; font-size: 13px;">' +
+              (params[0].axisValueLabel || params[0].name) + '</div>';
+          }
+
+          // Process each series with minimal bullets
+          for (let i = 0; i < params.length; i++) {
+            const param = params[i];
+            const color = param.color || '#000';
+            const name = param.seriesName || 'Channel ' + (i + 1);
+            const value = param.value !== undefined ? param.value : 'N/A';
+
+            html += '<div style="display: flex; align-items: center; margin: 1px 0; font-size: 11px; line-height: 1.1;">' +
+              '<span style="display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: ' + color + '; margin-right: 5px; flex-shrink: 0;"></span>' +
+              '<span style="margin-right: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100px;">' + name + ':</span>' +
+              '<span style="font-weight: bold;">' + value + '</span>' +
+              '</div>';
+          }
+
+          return html;
         }
       },
       legend: {
@@ -757,8 +789,13 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         name: 'ADC Value',
         nameLocation: 'middle',
         nameGap: 50,
-        min: 0,
-        max: 1023
+
+        scale: true,
+        min: 'dataMin',
+        max: 'dataMax',
+        boundaryGap: ['5%', '5%'],
+
+        startFromZero: true
       },
       dataZoom: [
         {

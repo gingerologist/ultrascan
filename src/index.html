@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultrasonic Scanner Interface</title>
-    <!-- <link rel="stylesheet" href="index.css"> -->
     <style>
         /* Complete index.css - All styles for Ultrasonic Scanner Interface */
 
@@ -378,6 +377,148 @@
             margin: 0;
             color: #555;
         }
+
+        /* ============================================ */
+        /* CHANNEL SELECTION TABLE STYLES (NEW)        */
+        /* ============================================ */
+
+        /* Channel Selection Container */
+        #channelSelectionContainer {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+
+        .channel-selection {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+
+        .channel-selection h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        /* Check All Controls */
+        .check-all-controls {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+
+        .check-all-controls label {
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .check-all-controls input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        /* Channel Grid */
+        .channel-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 8px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .channel-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            transition: background-color 0.2s ease;
+            min-height: 50px;
+            justify-content: center;
+        }
+
+        .channel-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .channel-item.selected {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+
+        .channel-item label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+            text-align: center;
+            cursor: pointer;
+            line-height: 1.2;
+        }
+
+        .channel-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        /* Selection Summary */
+        .selection-summary {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e7f3ff;
+            border: 1px solid #b3d7ff;
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .selection-summary .count {
+            font-weight: bold;
+            color: #0066cc;
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 1000px) {
+            .channel-grid {
+                grid-template-columns: repeat(8, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .channel-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .channel-item {
+                min-height: 45px;
+                padding: 6px 2px;
+            }
+            
+            .channel-item label {
+                font-size: 10px;
+            }
+        }
     </style>
 </head>
 
@@ -475,6 +616,29 @@
 
         <!-- ECharts Container -->
         <div id="chartContainer" class="chart-container" style="display: none;"></div>
+
+        <!-- Channel Selection Container (NEW) -->
+        <div id="channelSelectionContainer" class="channel-selection" style="display: none;">
+            <h4>Channel Selection</h4>
+            
+            <!-- Check All Controls -->
+            <div class="check-all-controls">
+                <label>
+                    <input type="checkbox" id="checkAllChannels" checked>
+                    Check All Channels
+                </label>
+            </div>
+
+            <!-- Channel Grid -->
+            <div id="channelGrid" class="channel-grid">
+                <!-- Channel checkboxes will be generated by JavaScript -->
+            </div>
+
+            <!-- Selection Summary -->
+            <div id="selectionSummary" class="selection-summary">
+                Selected: <span class="count">64</span> of 64 channels
+            </div>
+        </div>
     </div>
 
     <div class="info">
@@ -486,13 +650,9 @@
                 scan.</li>
             <li>Connect to your ultrasonic scanner device first, then select trigger mode.</li>
             <li>Green = Scan Complete, Red = Scan Failed/Incomplete, Yellow = In Progress</li>
+            <li><strong>Channel Selection:</strong> Use the checkboxes below the chart to select which channels to display. Channel selection persists when switching between angles and steps.</li>
         </ul>
     </div>
-
-    <script>
-        // This will be replaced with the integrated JavaScript
-        console.log('Ultrasonic Scanner Interface loaded');
-    </script>
 </body>
 
 </html>

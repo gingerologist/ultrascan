@@ -2,10 +2,6 @@ export { }; // Make this file a module
 
 // Import the parser and ECharts
 import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
-
-// import { passiveSupport } from 'passive-events-support/src/utils'
-// passiveSupport({ events: ['mousewheel', 'wheel']})
-
 import * as echarts from 'echarts';
 
 // Web Serial API type definitions
@@ -76,6 +72,12 @@ class UltrasonicScannerInterface {
   private scanConfigDisplay: HTMLElement;
   private scanConfigText: HTMLElement;
 
+  // NEW: Channel selection elements
+  private channelSelectionContainer: HTMLElement;
+  private checkAllChannels: HTMLInputElement;
+  private channelGrid: HTMLElement;
+  private selectionSummary: HTMLElement;
+
   // State
   private availablePorts: SerialPort[] = [];
   private selectedPort: SerialPort | null = null;
@@ -94,25 +96,24 @@ class UltrasonicScannerInterface {
   // Chart instance
   private chart: any = null;
 
-  constructor() {
+  // NEW: Channel selection state
+  private selectedChannels: Set<number> = new Set();
 
+  constructor() {
     console.log('🚀 Constructor: isRunning initial value =', this.isRunning);
+
+    // Initialize all channels as selected by default
+    for (let i = 0; i < 64; i++) {
+      this.selectedChannels.add(i);
+    }
 
     this.initializeElements();
     this.initializeParser();
     this.initializeEventListeners();
     this.initializeChart();
+    this.initializeChannelSelection(); // NEW
     this.startPortPolling();
     this.updateUI();
-
-    // setTimeout(() => {
-    //   console.log('🔍 RUN button status:', {
-    //     exists: !!this.runStopButton,
-    //     visible: this.runStopButton?.style.display,
-    //     disabled: this.runStopButton?.disabled,
-    //     text: this.runStopButton?.textContent
-    //   });
-    // }, 1000);
 
     this.debugElementStatus();
     this.verifyCSSLoaded();
@@ -144,6 +145,12 @@ class UltrasonicScannerInterface {
     this.scanConfigDisplay = document.getElementById('scanConfigDisplay') as HTMLElement;
     this.scanConfigText = document.getElementById('scanConfigText') as HTMLElement;
 
+    // NEW: Channel selection elements
+    this.channelSelectionContainer = document.getElementById('channelSelectionContainer') as HTMLElement;
+    this.checkAllChannels = document.getElementById('checkAllChannels') as HTMLInputElement;
+    this.channelGrid = document.getElementById('channelGrid') as HTMLElement;
+    this.selectionSummary = document.getElementById('selectionSummary') as HTMLElement;
+
     // Check core elements
     const missingElements: string[] = [];
 
@@ -153,16 +160,174 @@ class UltrasonicScannerInterface {
     if (!this.connectionStatus) missingElements.push('connectionStatus');
     if (!this.runStopButton) missingElements.push('runStopButton');
     if (!this.chartContainer) missingElements.push('chartContainer');
+    if (!this.channelSelectionContainer) missingElements.push('channelSelectionContainer'); // NEW
 
     if (missingElements.length > 0) {
       console.error('Missing HTML elements:', missingElements.join(', '));
-      console.log('Element status:');
-      console.log('- portSelect:', !!this.portSelect);
-      console.log('- connectButton:', !!this.connectButton);
-      console.log('- disconnectButton:', !!this.disconnectButton);
-      console.log('- connectionStatus:', !!this.connectionStatus);
-      console.log('- runStopButton:', !!this.runStopButton);
-      console.log('- chartContainer:', !!this.chartContainer);
+    }
+  }
+
+  // NEW: Initialize channel selection functionality
+  private initializeChannelSelection(): void {
+    console.log('📋 Initializing channel selection grid');
+    
+    if (!this.channelGrid) {
+      console.error('Channel grid element not found');
+      return;
+    }
+
+    // Clear existing content
+    this.channelGrid.innerHTML = '';
+
+    // Create 64 channel checkboxes arranged in 4 rows × 16 columns
+    for (let channel = 0; channel < 64; channel++) {
+      const channelItem = document.createElement('div');
+      channelItem.className = 'channel-item selected'; // Start with all selected
+      
+      const label = document.createElement('label');
+      label.textContent = `CH${channel}`;
+      label.setAttribute('for', `channel_${channel}`);
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `channel_${channel}`;
+      checkbox.checked = true; // Start with all checked
+      checkbox.dataset.channel = channel.toString();
+      
+      // Add event listener for individual channel checkboxes
+      checkbox.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        this.handleChannelCheckboxChange(parseInt(target.dataset.channel!), target.checked);
+      });
+      
+      channelItem.appendChild(label);
+      channelItem.appendChild(checkbox);
+      this.channelGrid.appendChild(channelItem);
+    }
+
+    // Initialize check-all checkbox event listener
+    if (this.checkAllChannels) {
+      this.checkAllChannels.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        this.handleCheckAllChange(target.checked);
+      });
+    }
+
+    // Update initial summary
+    this.updateSelectionSummary();
+    
+    console.log('📋 Channel selection grid initialized with 64 channels');
+  }
+
+  // NEW: Handle individual channel checkbox changes
+  private handleChannelCheckboxChange(channel: number, isChecked: boolean): void {
+    console.log(`📋 Channel ${channel} ${isChecked ? 'selected' : 'deselected'}`);
+    
+    // Update selected channels set
+    if (isChecked) {
+      this.selectedChannels.add(channel);
+    } else {
+      this.selectedChannels.delete(channel);
+    }
+
+    // Update visual state
+    const channelItem = document.querySelector(`#channel_${channel}`)?.parentElement;
+    if (channelItem) {
+      if (isChecked) {
+        channelItem.classList.add('selected');
+      } else {
+        channelItem.classList.remove('selected');
+      }
+    }
+
+    // Update check-all checkbox state
+    this.updateCheckAllState();
+    
+    // Update selection summary
+    this.updateSelectionSummary();
+    
+    // Update chart if data is available
+    if (this.displayScanData && this.chart) {
+      this.updateChart();
+    }
+  }
+
+  // NEW: Handle check-all checkbox changes
+  private handleCheckAllChange(isChecked: boolean): void {
+    console.log(`📋 Check all channels: ${isChecked}`);
+    
+    // Update all individual checkboxes
+    for (let channel = 0; channel < 64; channel++) {
+      const checkbox = document.getElementById(`channel_${channel}`) as HTMLInputElement;
+      const channelItem = checkbox?.parentElement;
+      
+      if (checkbox && checkbox.checked !== isChecked) {
+        checkbox.checked = isChecked;
+        
+        // Update visual state
+        if (channelItem) {
+          if (isChecked) {
+            channelItem.classList.add('selected');
+            this.selectedChannels.add(channel);
+          } else {
+            channelItem.classList.remove('selected');
+            this.selectedChannels.delete(channel);
+          }
+        }
+      }
+    }
+
+    // Update selection summary
+    this.updateSelectionSummary();
+    
+    // Update chart if data is available
+    if (this.displayScanData && this.chart) {
+      this.updateChart();
+    }
+  }
+
+  // NEW: Update check-all checkbox state based on individual selections
+  private updateCheckAllState(): void {
+    if (!this.checkAllChannels) return;
+
+    const selectedCount = this.selectedChannels.size;
+    
+    if (selectedCount === 64) {
+      // All channels selected
+      this.checkAllChannels.checked = true;
+      this.checkAllChannels.indeterminate = false;
+    } else if (selectedCount === 0) {
+      // No channels selected
+      this.checkAllChannels.checked = false;
+      this.checkAllChannels.indeterminate = false;
+    } else {
+      // Some channels selected
+      this.checkAllChannels.checked = false;
+      this.checkAllChannels.indeterminate = true;
+    }
+  }
+
+  // NEW: Update selection summary display
+  private updateSelectionSummary(): void {
+    if (!this.selectionSummary) return;
+
+    const selectedCount = this.selectedChannels.size;
+    const countSpan = this.selectionSummary.querySelector('.count');
+    
+    if (countSpan) {
+      countSpan.textContent = selectedCount.toString();
+    }
+    
+    // Update summary text color based on selection
+    if (selectedCount === 0) {
+      this.selectionSummary.style.backgroundColor = '#ffebee';
+      this.selectionSummary.style.borderColor = '#f8bbd9';
+    } else if (selectedCount < 64) {
+      this.selectionSummary.style.backgroundColor = '#fff3e0';
+      this.selectionSummary.style.borderColor = '#ffcc80';
+    } else {
+      this.selectionSummary.style.backgroundColor = '#e7f3ff';
+      this.selectionSummary.style.borderColor = '#b3d7ff';
     }
   }
 
@@ -217,9 +382,7 @@ class UltrasonicScannerInterface {
 
     if (this.runStopButton) {
       this.runStopButton.addEventListener('click', () => {
-        // console.log('🖱️ CLICK: isRunning BEFORE toggle =', this.isRunning);
         this.toggleRunStop();
-        // console.log('🖱️ CLICK: isRunning AFTER toggle =', this.isRunning);
       });
     }
 
@@ -232,6 +395,7 @@ class UltrasonicScannerInterface {
 
     if (this.angleSelect) {
       this.angleSelect.addEventListener('change', () => {
+        this.updateStepSelector(this.displayScanData?.metadata.scanConfig);
         this.updateChart();
       });
     }
@@ -387,14 +551,9 @@ class UltrasonicScannerInterface {
       this.connectedPort = this.selectedPort;
       this.connectionState = 'connected';
 
-      // ADD THIS DEBUG:
-      // console.log('🔗 After connection: isRunning =', this.isRunning);
-
       this.setConnectionStatus(`Connected to ${this.getPortDisplayName(this.connectedPort)}`, 'connected');
 
-      // console.log('🔗 About to start data reading...'); // ADD THIS
       this.startDataReading();
-      // console.log('🔗 startDataReading() call completed'); // ADD THIS
       this.updateUI();
 
     } catch (error) {
@@ -420,7 +579,6 @@ class UltrasonicScannerInterface {
       this.reader = this.connectedPort.readable.getReader();
       try {
         while (this.reader && this.connectionState === 'connected') {
-          // console.log('🔄 About to read from serial port...');
           const { value, done } = await this.reader.read();
 
           if (done) {
@@ -428,16 +586,12 @@ class UltrasonicScannerInterface {
             break;
           }
 
-          // console.log('📦 Raw data received:', value.length, 'bytes');
-          // console.log('🏃 isRunning:', this.isRunning);        
-
           if (this.isRunning) {
             this.dataParser.processData(value);
           }
         }
       } catch (loopError) {
         console.error('💥 Error in read loop:', loopError);
-        // break;
         this.connectionState = 'error';
       }
     } catch (error) {
@@ -476,12 +630,15 @@ class UltrasonicScannerInterface {
     // Cleanup chart
     this.cleanupChart();
 
-    // Hide chart controls
+    // Hide chart controls and channel selection
     if (this.chartControlsContainer) {
       this.chartControlsContainer.style.display = 'none';
     }
     if (this.chartContainer) {
       this.chartContainer.style.display = 'none';
+    }
+    if (this.channelSelectionContainer) { // NEW
+      this.channelSelectionContainer.style.display = 'none';
     }
     if (this.scanConfigDisplay) {
       this.scanConfigDisplay.style.display = 'none';
@@ -521,37 +678,18 @@ class UltrasonicScannerInterface {
       this.stopCapture();
     }
   }
-  private updateRunStopButton(): void {
-    //console.log('🎨 updateRunStopButton called: isRunning =', this.isRunning);
-    //console.trace('🎨 Call stack:');
-    //console.log('🎨 runStopButton exists:', !!this.runStopButton);
 
+  private updateRunStopButton(): void {
     if (!this.runStopButton) return;
 
     if (this.isRunning) {
-      //console.log('🎨 Setting button to STOP (red)');
       this.runStopButton.textContent = 'STOP';
       this.runStopButton.className = 'run-stop-btn running';
     } else {
-      //console.log('🎨 Setting button to RUN (green)');
       this.runStopButton.textContent = 'RUN';
       this.runStopButton.className = 'run-stop-btn stopped';
     }
-
-    //console.log('🎨 Button text after update:', this.runStopButton.textContent);
   }
-
-  // private updateRunStopButton(): void {
-  //   if (!this.runStopButton) return;
-
-  //   if (this.isRunning) {
-  //     this.runStopButton.textContent = 'STOP';
-  //     this.runStopButton.className = 'run-stop-btn running';
-  //   } else {
-  //     this.runStopButton.textContent = 'RUN';
-  //     this.runStopButton.className = 'run-stop-btn stopped';
-  //   }
-  // }
 
   private startSingleCapture(): void {
     this.displayScanData = null;
@@ -636,11 +774,11 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     this.updateStepSelector(config);
   }
 
-  private updateStepSelector(config: any): void {
+  private updateStepSelector(config?: any): void {
     if (!this.stepSelect || !this.angleSelect) return;
 
     const selectedAngleIndex = parseInt(this.angleSelect.value) || 0;
-    const selectedAngle = config.angles[selectedAngleIndex];
+    const selectedAngle = config?.angles[selectedAngleIndex];
     const numSteps = selectedAngle?.numSteps || 0;
 
     console.log(`📊 Updating step selector for angle ${selectedAngleIndex}: ${numSteps} steps available`);
@@ -667,7 +805,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
   }
 
   private showChartControls(func: () => void = () => { }): void {
-    console.log('📊 showChartControls called');
+    console.log('📊 Showing chart controls and channel selection');
 
     if (this.chartControlsContainer) {
       this.chartControlsContainer.style.display = 'flex';
@@ -687,9 +825,11 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       console.log('📊 Container dimensions after forcing:',
         this.chartContainer.getBoundingClientRect().width, 'x',
         this.chartContainer.getBoundingClientRect().height);
+    }
 
-      // Test CSS after showing
-      this.testCSSAfterShow();
+    // NEW: Show channel selection
+    if (this.channelSelectionContainer) {
+      this.channelSelectionContainer.style.display = 'block';
     }
 
     // Small delay to ensure layout is computed
@@ -729,6 +869,11 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         text: 'Ultrasonic Data - 64 Channels',
         left: 'center'
       },
+      animation: false, // Disable animatio
+      animationDuration: 0, // Disable animation duration
+      useGPUTranslucency: true,
+      progressive: 2000,
+      blendMode: 'source-over',
       tooltip: {
         trigger: 'axis',
         axisPointer: {
@@ -789,12 +934,10 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         name: 'ADC Value',
         nameLocation: 'middle',
         nameGap: 50,
-
         scale: true,
         min: 'dataMin',
         max: 'dataMax',
         boundaryGap: ['5%', '5%'],
-
         startFromZero: true
       },
       dataZoom: [
@@ -849,62 +992,17 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     };
   }
 
-  private waitForContainerDimensions(callback: () => void, maxAttempts: number = 10): void {
-    let attempts = 0;
-
-    const checkDimensions = () => {
-      if (!this.chartContainer) {
-        callback();
-        return;
-      }
-
-      // Force layout recalculation
-      this.chartContainer.offsetHeight;
-
-      const rect = this.chartContainer.getBoundingClientRect();
-      console.log(`📊 Chart container dimensions (attempt ${attempts + 1}):`, rect.width, 'x', rect.height);
-
-      if (rect.width > 0 && rect.height > 0) {
-        // Container has proper dimensions
-        callback();
-      } else if (attempts < maxAttempts) {
-        attempts++;
-        // Use requestAnimationFrame to wait for next layout cycle
-        requestAnimationFrame(() => {
-          setTimeout(checkDimensions, 50); // Small delay between attempts
-        });
-      } else {
-        // Fallback: force dimensions and proceed
-        console.warn('📊 Chart container dimensions timeout, forcing dimensions');
-        this.forceContainerDimensions();
-        callback();
-      }
-    };
-
-    // Start checking immediately
-    requestAnimationFrame(checkDimensions);
-  }
-
-  private forceContainerDimensions(): void {
-    if (!this.chartContainer) return;
-
-    // Force container to have dimensions
-    this.chartContainer.style.width = '100%';
-    this.chartContainer.style.height = '400px';
-    this.chartContainer.style.minHeight = '400px';
-    this.chartContainer.style.display = 'block';
-
-    // Force layout recalculation
-    this.chartContainer.offsetHeight;
-
-    console.log('📊 Forced container dimensions');
-  }
-
+  // MODIFIED: Update chart to only show selected channels
   private updateChart(): void {
     if (!this.chart || !this.displayScanData || !this.angleSelect || !this.stepSelect) {
       console.warn('📊 Cannot update chart: missing dependencies');
       return;
     }
+
+    // ds suggested, not tried yet.
+    // if (!this.chart.isDisposed()) {
+    //   this.chart.clear();
+    // }
 
     if (this.chart.isDisposed()) {
       console.warn('📊 Chart is disposed, reinitializing...');
@@ -917,6 +1015,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const stepIndex = parseInt(this.stepSelect.value) || 0;
 
     console.log(`📊 Updating chart for angle ${angleIndex}, step ${stepIndex}`);
+    console.log(`📊 Selected channels: ${this.selectedChannels.size}/64`);
 
     // Debug: Check what data keys are available
     const availableKeys = Array.from(this.displayScanData.dataPackets.keys());
@@ -925,14 +1024,18 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     );
 
     console.log(`📊 Available data keys for angle ${angleIndex}, step ${stepIndex}:`, keysForThisAngleStep.length);
-    console.log(`📊 Sample keys:`, keysForThisAngleStep.slice(0, 5));
 
     const series: any[] = [];
     let maxSamples = 0;
     let channelsWithData = 0;
 
-    // Create series for each channel
+    // Create series for each SELECTED channel only
     for (let channel = 0; channel < 64; channel++) {
+      // NEW: Skip channels that are not selected
+      if (!this.selectedChannels.has(channel)) {
+        continue;
+      }
+
       const dataKey = `${angleIndex}_${stepIndex}_${channel}`;
       const packet = this.displayScanData.dataPackets.get(dataKey);
 
@@ -942,10 +1045,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       if (hasData) {
         maxSamples = Math.max(maxSamples, data.length);
         channelsWithData++;
-      }
 
-      // Only add series for channels that have data (to improve performance)
-      if (hasData) {
         series.push({
           name: `Channel ${channel}`,
           type: 'line',
@@ -965,24 +1065,26 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
 
-    console.log(`📊 Chart update: ${channelsWithData}/64 channels have data, max samples: ${maxSamples}`);
+    console.log(`📊 Chart update: ${channelsWithData}/${this.selectedChannels.size} selected channels have data, max samples: ${maxSamples}`);
 
     try {
       this.chart.setOption({
         title: {
-          text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/64 channels)`
+          text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/${this.selectedChannels.size} selected channels)`
         },
         xAxis: {
           data: xAxisData
         },
         series: series
+      }, {
+        replaceMerge: 'series'
       });
 
       console.log('📊 Chart updated successfully');
 
-      // Show warning if no data available
-      if (channelsWithData === 0) {
-        console.warn(`📊 No data available for Angle ${angleIndex}, Step ${stepIndex}`);
+      // Show warning if no data available for selected channels
+      if (channelsWithData === 0 && this.selectedChannels.size > 0) {
+        console.warn(`📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`);
       }
     } catch (error) {
       console.error('📊 Failed to update chart:', error);
@@ -1073,8 +1175,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         this.progressFill.textContent = `${Math.round(progress)}%`;
       }
 
-      //console.log(`📊 Display Update: ${scan.dataPackets.size}/${expected} packets (${progress.toFixed(1)}%)`);
-
     } else {
       // Clear display
       if (this.bootIdEl) this.bootIdEl.textContent = '-';
@@ -1107,6 +1207,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     console.log('- chartContainer:', !!this.chartContainer, this.chartContainer?.id);
     console.log('- chartControlsContainer:', !!this.chartControlsContainer, this.chartControlsContainer?.id);
     console.log('- scanConfigDisplay:', !!this.scanConfigDisplay, this.scanConfigDisplay?.id);
+    console.log('- channelSelectionContainer:', !!this.channelSelectionContainer, this.channelSelectionContainer?.id); // NEW
     console.log('- angleSelect:', !!this.angleSelect, this.angleSelect?.id);
     console.log('- stepSelect:', !!this.stepSelect, this.stepSelect?.id);
     console.log('- updateChartButton:', !!this.updateChartButton, this.updateChartButton?.id);
@@ -1121,7 +1222,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     }
   }
 
-  // Also add this CSS verification method
   private verifyCSSLoaded(): void {
     if (this.chartContainer) {
       // Test 1: Check if basic CSS is applied
@@ -1155,21 +1255,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       console.log('- height:', actualStyles.height);
       console.log('- width:', actualStyles.width);
       console.log('- min-height:', actualStyles.minHeight);
-    }
-  }
-
-  // Also add a method to test CSS after showing the chart
-  private testCSSAfterShow(): void {
-    if (this.chartContainer) {
-      console.log('🎨 CSS Test After Show:');
-      const rect = this.chartContainer.getBoundingClientRect();
-      const styles = window.getComputedStyle(this.chartContainer);
-
-      console.log('- getBoundingClientRect:', rect.width, 'x', rect.height);
-      console.log('- computed display:', styles.display);
-      console.log('- computed height:', styles.height);
-      console.log('- computed width:', styles.width);
-      console.log('- has chart-visible class:', this.chartContainer.classList.contains('chart-visible'));
     }
   }
 }

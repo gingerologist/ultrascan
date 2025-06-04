@@ -84,16 +84,30 @@ export interface ScanData {
   timestamp: number;
 }
 
+export function stm32h7_crc32(data: Uint32Array): number {
+  let crc32: number = 0xffffffff;
+  for (let i = 0; i < data.length; i++) {
+    crc32 = crc32 ^ (data[i] >>> 0);
+    for (let j = 0; j < 32; j++) {
+      if (crc32 & 0x80000000)
+        crc32 = ((crc32 << 1) >>> 0) ^ 0x04C11DB7; // 0xB71DC104
+      else
+        crc32 = ((crc32 << 1) >>> 0);
+    }
+  }
+  return crc32;
+}
+
 export class UltrasonicDataParser {
   private buffer: Uint8Array = new Uint8Array(0);
   private currentScan: ScanData | null = null;
   private completedScan: ScanData | null = null; // For auto mode - keep last completed scan
   private scans: Map<string, ScanData> = new Map(); // key: "bootId_scanId"
   private triggerMode: 'auto' | 'single' = 'auto';
-  
+
   // Sync pattern for packet alignment (fixed boot ID in little-endian)
   private static readonly SYNC_PATTERN = [0xA6, 0xA5, 0xA5, 0xA5]; // 0xA5A5A5A6 in little-endian
-  
+
   // Callbacks for events
   public onMetadataReceived?: (metadata: MetadataPacket) => void;
   public onDataPacketReceived?: (packet: DataPacket) => void;
@@ -114,7 +128,7 @@ export class UltrasonicDataParser {
       if (!packet) {
         break; // Need more data or no valid packet found
       }
-      
+
       this.handlePacket(packet);
     }
   }
@@ -124,51 +138,51 @@ export class UltrasonicDataParser {
     while (this.buffer.length >= 15) { // Minimum packet size
       // Look for packet type (0x01 or 0x02) followed by sync pattern
       if (this.buffer.length < 9) break; // Need at least 1 + 4 + 4 bytes
-      
+
       const packetType = this.buffer[0];
-      
+
       // Check if this looks like a valid packet start
       if (packetType === 0x01 || packetType === 0x02) {
         // Check if sync pattern follows at offset 1-4 (boot ID position)
-        const syncMatch = UltrasonicDataParser.SYNC_PATTERN.every((byte, index) => 
+        const syncMatch = UltrasonicDataParser.SYNC_PATTERN.every((byte, index) =>
           this.buffer.length > (1 + index) && this.buffer[1 + index] === byte
         );
-        
+
         if (syncMatch) {
           // Found valid sync pattern, try to parse packet
           const view = new DataView(this.buffer.buffer, this.buffer.byteOffset);
-          
+
           const bootId = view.getUint32(1, true); // Should be 0xA5A5A5A6
           const scanId = view.getUint32(5, true);
           const length = view.getUint16(9, true);
-          
+
           // Validate length is reasonable
           if (length < 15 || length > 8192) {
             this.onParseError?.(`Invalid packet length: ${length}`, this.buffer.slice(0, Math.min(32, this.buffer.length)));
             this.buffer = this.buffer.slice(1); // Skip this byte and try again
             continue;
           }
-          
+
           // Check if we have complete packet
           if (this.buffer.length < length) {
             return null; // Need more data
           }
-          
+
           // Extract and verify CRC
           const packetData = this.buffer.slice(0, length);
           const headerAndPayload = packetData.slice(0, length - 4);
           const receivedCrc = view.getUint32(length - 4, true);
-          
+
           const calculatedCrc = this.calculateCRC32(headerAndPayload);
           if (receivedCrc !== calculatedCrc) {
             // Temporarily ignore CRC errors for testing
             // console.log(`CRC mismatch (ignored): expected 0x${calculatedCrc.toString(16)}, got 0x${receivedCrc.toString(16)}`);
             // Continue parsing instead of skipping
           }
-          
+
           // Remove packet from buffer
           this.buffer = this.buffer.slice(length);
-          
+
           // Parse based on packet type
           if (packetType === 0x01) {
             return this.parseMetadataPacket(packetData, view, bootId, scanId, length, receivedCrc);
@@ -177,11 +191,11 @@ export class UltrasonicDataParser {
           }
         }
       }
-      
+
       // No valid packet found at this position, advance by 1 byte and try again
       this.buffer = this.buffer.slice(1);
     }
-    
+
     return null; // Need more data or no valid packet found
   }
 
@@ -190,7 +204,7 @@ export class UltrasonicDataParser {
     const payloadStart = 11;
     const payloadLength = length - 15; // Exclude 11-byte header and 4-byte CRC
     const configData = packetData.slice(payloadStart, payloadStart + payloadLength);
-    
+
     // Parse scan configuration according to C struct
     const scanConfig = this.parseScanConfig(configData);
 
@@ -209,22 +223,22 @@ export class UltrasonicDataParser {
     const angleIndex = view.getUint8(11);
     const stepIndex = view.getUint8(12);
     const channelIndex = view.getUint8(13);
-    
+
     const dataChunkStart = 14;
     const dataChunkLength = length - 18; // Exclude 14-byte header and 4-byte CRC
     const dataChunk = packetData.slice(dataChunkStart, dataChunkStart + dataChunkLength);
-    
+
     // Unpack 10-bit samples (8 samples per 10 bytes)
     const samples = this.unpack10BitSamples(dataChunk);
-    
+
     // Validate sample count if we have scan configuration
     if (this.currentScan && this.currentScan.metadata) {
       const config = this.currentScan.metadata.scanConfig;
       const expectedSamples = 20 * (config.captureEndUs - config.captureStartUs);
-      
+
       if (samples.length !== expectedSamples) {
         console.warn(`Sample count mismatch: expected ${expectedSamples}, got ${samples.length} ` +
-                    `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)`);
+          `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)`);
       }
     }
 
@@ -247,7 +261,7 @@ export class UltrasonicDataParser {
     }
 
     const view = new DataView(configData.buffer, configData.byteOffset);
-    
+
     // Struct layout with exact byte offsets:
     // capture_start_us: 0-1 (uint16_t)
     // capture_end_us: 2-3 (uint16_t)  
@@ -260,48 +274,48 @@ export class UltrasonicDataParser {
     // repeat_count: 5754-5755 (uint16_t)
     // tail_count: 5756-5757 (uint16_t)
     // tx_start_del: 5758-5759 (uint16_t)
-    
+
     // Read basic fields
     const captureStartUs = view.getUint16(0, true);
     const captureEndUs = view.getUint16(2, true);
     const numAngles = view.getUint16(4, true);
     const numPatternSegments = view.getUint16(6, true);
-    
+
     // Parse name from offset 5704
     const nameBytes = configData.slice(5704, 5736);
     const nullIndex = nameBytes.indexOf(0);
     const name = new TextDecoder().decode(nameBytes.slice(0, nullIndex >= 0 ? nullIndex : 32));
-    
+
     const trSwDelMode = view.getUint16(5752, true) !== 0;
     const repeatCount = view.getUint16(5754, true);
     const tailCount = view.getUint16(5756, true);
     const txStartDel = view.getUint16(5758, true);
-    
+
     // Parse angles array to get num_steps for each angle
     const angles: any[] = [];
     let totalSteps = 0;
-    
+
     for (let i = 0; i < numAngles; i++) {
       const angleOffset = 8 + (i * 356); // angles[16] starts at offset 8, each angle is 356 bytes
       const numSteps = view.getUint32(angleOffset, true); // num_steps is first field (uint32_t)
-      
+
       // Parse label (32 bytes starting at angleOffset + 4)
       const labelBytes = configData.slice(angleOffset + 4, angleOffset + 36);
       const labelNullIndex = labelBytes.indexOf(0);
       const label = new TextDecoder().decode(labelBytes.slice(0, labelNullIndex >= 0 ? labelNullIndex : 32));
-      
+
       angles.push({
         numSteps,
         label
       });
-      
+
       totalSteps += numSteps;
       console.log(`📊 Angle ${i}: ${numSteps} steps, label: "${label}"`);
     }
-    
+
     console.log(`📊 Total steps across ${numAngles} angles: ${totalSteps}`);
     console.log(`📊 Expected packets: ${totalSteps} steps × 64 channels = ${totalSteps * 64}`);
-    
+
     return {
       name,
       patternSegments: [], // Skip parsing pattern_segments for now
@@ -320,37 +334,37 @@ export class UltrasonicDataParser {
 
   private unpack10BitSamples(dataChunk: Uint8Array): number[] {
     const samples: number[] = [];
-    
+
     // Process in groups of 10 bytes (8 samples each)
     for (let i = 0; i < dataChunk.length; i += 10) {
       if (i + 9 >= dataChunk.length) break; // Incomplete group
-      
+
       // Extract 8 samples from 10 bytes
       const bytes = dataChunk.slice(i, i + 10);
       const group = this.extract8SamplesFrom10Bytes(bytes);
       samples.push(...group);
     }
-    
+
     return samples;
   }
 
   private extract8SamplesFrom10Bytes(bytes: Uint8Array): number[] {
     // Bit-packed 10-bit samples: 8 samples in 10 bytes (80 bits total)
     const samples: number[] = [];
-    
+
     for (let i = 0; i < 8; i++) {
       const bitOffset = i * 10;
       const byteOffset = Math.floor(bitOffset / 8);
       const bitInByte = bitOffset % 8;
-      
+
       let sample = 0;
-      
+
       // Read 10 bits, potentially spanning 2 bytes
       if (bitInByte <= 6) {
         // Sample fits within 2 bytes
         const byte1 = bytes[byteOffset];
         const byte2 = byteOffset + 1 < bytes.length ? bytes[byteOffset + 1] : 0;
-        
+
         sample = ((byte2 << 8) | byte1) >> bitInByte;
         sample &= 0x3FF; // Mask to 10 bits
       } else {
@@ -358,34 +372,43 @@ export class UltrasonicDataParser {
         const byte1 = bytes[byteOffset];
         const byte2 = byteOffset + 1 < bytes.length ? bytes[byteOffset + 1] : 0;
         const byte3 = byteOffset + 2 < bytes.length ? bytes[byteOffset + 2] : 0;
-        
+
         sample = ((byte3 << 16) | (byte2 << 8) | byte1) >> bitInByte;
         sample &= 0x3FF; // Mask to 10 bits
       }
-      
+
       samples.push(sample);
+
+      return samples.map((n: number) => {
+        if ((n & 0x200) === 0) {
+          return n - 512;
+        }
+        else {
+          return n - 512;
+        }
+      })
     }
-    
+
     return samples;
   }
 
   private handlePacket(packet: MetadataPacket | DataPacket): void {
     const scanKey = `${packet.bootId}_${packet.scanId}`;
-    
+
     if (packet.packetType === 0x01) {
       // Metadata packet - start new scan
       const metadata = packet as MetadataPacket;
-      
+
       // Check for device reboot
       if (this.currentScan && this.currentScan.bootId !== packet.bootId) {
         this.onDeviceReboot?.(packet.bootId, this.currentScan.bootId);
       }
-      
+
       // In single mode, clear previous scan when starting new one
       if (this.triggerMode === 'single') {
         this.completedScan = null;
       }
-      
+
       this.currentScan = {
         bootId: packet.bootId,
         scanId: packet.scanId,
@@ -394,26 +417,26 @@ export class UltrasonicDataParser {
         isComplete: false,
         timestamp: Date.now()
       };
-      
+
       this.scans.set(scanKey, this.currentScan);
       this.onMetadataReceived?.(metadata);
-      
+
     } else if (packet.packetType === 0x02) {
       // Data packet
       const dataPacket = packet as DataPacket;
-      
+
       const scan = this.scans.get(scanKey);
       if (!scan) {
         this.onParseError?.(`Received data packet without metadata for scan ${scanKey}`, new Uint8Array());
         return;
       }
-      
+
       // Store data packet
       const dataKey = `${dataPacket.angleIndex}_${dataPacket.stepIndex}_${dataPacket.channelIndex}`;
       scan.dataPackets.set(dataKey, dataPacket);
-      
+
       this.onDataPacketReceived?.(dataPacket);
-      
+
       // Check if scan is complete
       this.checkScanComplete(scan);
     }
@@ -421,140 +444,76 @@ export class UltrasonicDataParser {
 
   // Fixed checkScanComplete method for parser.ts
 
-private checkScanComplete(scan: ScanData): void {
-  if (scan.isComplete) return;
-  
-  const config = scan.metadata.scanConfig;
-  
-  // Use metadata to determine expected totals - this is the authoritative source
-  const expectedAngles = config.numAngles;
-  const expectedStepsPerAngle = config.angles.map(angle => angle.numSteps);
-  const totalExpectedSteps = config.totalSteps || expectedStepsPerAngle.reduce((sum, steps) => sum + steps, 0);
-  
-  // Each step is transmitted on 64 channels (0-63)
-  const expectedChannels = 64;
-  const totalExpectedPackets = totalExpectedSteps * expectedChannels;
-  
-  // console.log(`📊 Scan completion check:`);
-  // console.log(`   Expected: ${expectedAngles} angles, ${totalExpectedSteps} total steps, ${expectedChannels} channels`);
-  // console.log(`   Expected packets: ${totalExpectedPackets}`);
-  // console.log(`   Received packets: ${scan.dataPackets.size}`);
-  // console.log(`   Progress: ${((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1)}%`);
-  
-  // Only mark complete when we have received ALL expected packets
-  if (scan.dataPackets.size >= totalExpectedPackets) {
-    // Additional verification: check that we have the expected range of indices
-    const receivedKeys = Array.from(scan.dataPackets.keys());
-    const angles = new Set<number>();
-    const steps = new Set<number>();
-    const channels = new Set<number>();
-    
-    receivedKeys.forEach(key => {
-      const [angle, step, channel] = key.split('_').map(Number);
-      angles.add(angle);
-      steps.add(step);
-      channels.add(channel);
-    });
-    
-    const maxAngleReceived = Math.max(...Array.from(angles));
-    const maxStepReceived = Math.max(...Array.from(steps));
-    const maxChannelReceived = Math.max(...Array.from(channels));
-    
-    console.log(`📊 Received ranges: angles 0-${maxAngleReceived}, steps 0-${maxStepReceived}, channels 0-${maxChannelReceived}`);
-    
-    // Verify we received data for all expected ranges
-    const hasAllAngles = maxAngleReceived >= (expectedAngles - 1);
-    const hasAllChannels = maxChannelReceived >= 63; // Channels should be 0-63
-    
-    if (hasAllAngles && hasAllChannels) {
-      scan.isComplete = true;
-      
-      if (this.triggerMode === 'auto') {
-        this.completedScan = scan;
-      }
-      
-      console.log(`✅ Scan marked complete: ${scan.dataPackets.size}/${totalExpectedPackets} packets`);
-      this.onScanComplete?.(scan);
-    } else {
-      console.log(`⏳ Scan not complete yet - missing ranges. All angles: ${hasAllAngles}, All channels: ${hasAllChannels}`);
-    }
-  } else {
-    // Calculate percentage for progress display
-    const progressPercent = ((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1);
-    // console.log(`⏳ Scan ${progressPercent}% complete (${scan.dataPackets.size}/${totalExpectedPackets} packets)`);
-  }
-}
-
-/*
   private checkScanComplete(scan: ScanData): void {
     if (scan.isComplete) return;
-    
+
     const config = scan.metadata.scanConfig;
-    
-    // Wait for enough packets to accurately determine the pattern
-    if (scan.dataPackets.size > 0 && scan.dataPackets.size >= 100) {
+
+    // Use metadata to determine expected totals - this is the authoritative source
+    const expectedAngles = config.numAngles;
+    const expectedStepsPerAngle = config.angles.map(angle => angle.numSteps);
+    const totalExpectedSteps = config.totalSteps || expectedStepsPerAngle.reduce((sum, steps) => sum + steps, 0);
+
+    // Each step is transmitted on 64 channels (0-63)
+    const expectedChannels = 64;
+    const totalExpectedPackets = totalExpectedSteps * expectedChannels;
+
+    // console.log(`📊 Scan completion check:`);
+    // console.log(`   Expected: ${expectedAngles} angles, ${totalExpectedSteps} total steps, ${expectedChannels} channels`);
+    // console.log(`   Expected packets: ${totalExpectedPackets}`);
+    // console.log(`   Received packets: ${scan.dataPackets.size}`);
+    // console.log(`   Progress: ${((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1)}%`);
+
+    // Only mark complete when we have received ALL expected packets
+    if (scan.dataPackets.size >= totalExpectedPackets) {
+      // Additional verification: check that we have the expected range of indices
       const receivedKeys = Array.from(scan.dataPackets.keys());
       const angles = new Set<number>();
       const steps = new Set<number>();
       const channels = new Set<number>();
-      
+
       receivedKeys.forEach(key => {
         const [angle, step, channel] = key.split('_').map(Number);
         angles.add(angle);
         steps.add(step);
         channels.add(channel);
       });
-      
-      const angleArray = Array.from(angles);
-      const stepArray = Array.from(steps);
-      const channelArray = Array.from(channels);
-      
-      const maxAngle = Math.max(...angleArray);
-      const maxStep = Math.max(...stepArray);
-      const maxChannel = Math.max(...channelArray);
-      const numChannelsReceived = channels.size;
-      
-      console.log(`Received ranges - Angles: ${Math.min(...angleArray)}-${maxAngle}, Steps: ${Math.min(...stepArray)}-${maxStep}, Channels: ${Math.min(...channelArray)}-${maxChannel} (${numChannelsReceived} unique channels)`);
-      
-      // Calculate expected based on complete pattern
-      const expectedAngles = maxAngle + 1;
-      const expectedSteps = maxStep + 1;
-      const expectedChannels = maxChannel + 1; // Use max channel + 1, not unique count
-      const expectedPackets = expectedAngles * expectedSteps * expectedChannels;
-      
-      console.log(`Scan progress: ${scan.dataPackets.size}/${expectedPackets} packets received (${expectedAngles} angles × ${expectedSteps} steps × ${expectedChannels} channels)`);
-      
-      if (scan.dataPackets.size >= expectedPackets) {
+
+      const maxAngleReceived = Math.max(...Array.from(angles));
+      const maxStepReceived = Math.max(...Array.from(steps));
+      const maxChannelReceived = Math.max(...Array.from(channels));
+
+      console.log(`📊 Received ranges: angles 0-${maxAngleReceived}, steps 0-${maxStepReceived}, channels 0-${maxChannelReceived}`);
+
+      // Verify we received data for all expected ranges
+      const hasAllAngles = maxAngleReceived >= (expectedAngles - 1);
+      const hasAllChannels = maxChannelReceived >= 63; // Channels should be 0-63
+
+      if (hasAllAngles && hasAllChannels) {
         scan.isComplete = true;
-        
+
         if (this.triggerMode === 'auto') {
           this.completedScan = scan;
         }
-        
+
+        console.log(`✅ Scan marked complete: ${scan.dataPackets.size}/${totalExpectedPackets} packets`);
         this.onScanComplete?.(scan);
+      } else {
+        console.log(`⏳ Scan not complete yet - missing ranges. All angles: ${hasAllAngles}, All channels: ${hasAllChannels}`);
       }
     } else {
-      // Not enough packets yet to determine pattern - use metadata as rough estimate
-      const expectedPackets = config.numAngles * 25 * 64;
-      console.log(`Scan progress: ${scan.dataPackets.size}/${expectedPackets} packets received (waiting for more data to determine pattern...)`);
-      
-      // Only complete if we've received a substantial number of packets
-      if (scan.dataPackets.size >= expectedPackets * 0.9) { // 90% threshold
-        scan.isComplete = true;
-        
-        if (this.triggerMode === 'auto') {
-          this.completedScan = scan;
-        }
-        
-        this.onScanComplete?.(scan);
-      }
+      // Calculate percentage for progress display
+      const progressPercent = ((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1);
+      // console.log(`⏳ Scan ${progressPercent}% complete (${scan.dataPackets.size}/${totalExpectedPackets} packets)`);
     }
-  } */
+  }
+
+
 
   private calculateCRC32(data: Uint8Array): number {
     // Standard IEEE 802.3 CRC-32 (original implementation)
     let crc = 0xFFFFFFFF;
-    
+
     for (let i = 0; i < data.length; i++) {
       crc ^= data[i];
       for (let j = 0; j < 8; j++) {
@@ -565,14 +524,14 @@ private checkScanComplete(scan: ScanData): void {
         }
       }
     }
-    
+
     return (~crc) >>> 0; // Convert to unsigned 32-bit
   }
 
   // Utility methods
   public setTriggerMode(mode: 'auto' | 'single'): void {
     this.triggerMode = mode;
-    
+
     // When switching to single mode, clear completed scan buffer
     if (mode === 'single') {
       this.completedScan = null;
@@ -652,3 +611,4 @@ private checkScanComplete(scan: ScanData): void {
     this.buffer = new Uint8Array(0);
   }
 }
+

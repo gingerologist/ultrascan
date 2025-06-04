@@ -84,7 +84,7 @@ export interface ScanData {
   timestamp: number;
 }
 
-export function stm32h7_crc32(data: Uint32Array): number {
+export const stm32h7_crc32 = (data: Uint32Array): number => {
   let crc32: number = 0xffffffff;
   for (let i = 0; i < data.length; i++) {
     crc32 = crc32 ^ (data[i] >>> 0);
@@ -95,7 +95,7 @@ export function stm32h7_crc32(data: Uint32Array): number {
         crc32 = ((crc32 << 1) >>> 0);
     }
   }
-  return crc32;
+  return (crc32 >>> 0);
 }
 
 export class UltrasonicDataParser {

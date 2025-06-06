@@ -1,42 +1,18 @@
 // Ultrasonic detection system data parser
 // Based on C structures from firmware
 
-/*
-C Structure Definitions (for reference):
+const PACKET_PREAMBLE = 0xA5A5A5A5
+const SIZEOF_PACKET_PREAMBLE = 4
+const SIZEOF_PACKET_HEADER_T = 8
+const SIZEOF_DATA_PACKET_HEADER_T = SIZEOF_PACKET_HEADER_T + 4
+const SIZEOF_PACKET_CRC = 4
+const SIZEOF_META_PACKET_PAYLOAD = 5760 // size of scan_conf_t
 
-// Individual step within an angle
-typedef struct {
-    uint32_t channel_mask;  // 0x1F register value (bit 1 = channel disabled for TX)
-} scan_step_t;
-
-// Single angle configuration
-typedef struct
-{
-  uint32_t num_steps;             // Actual number of steps used              // 4 byte
-  char label[32];                 // 31-character label + null terminator     // 32 bytes
-  TX7332_DLYPRF_t delay_profile;  // Reuse existing delay profile structure   // 64 bytes
-  scan_step_t steps[64];          // Up to 64 steps per angle                 // 256 bytes
-} scan_angle_t;
-Static_assert(sizeof(scan_angle_t)==356, "");
-
-// Enhanced scan configuration with capture window parameters
-typedef struct
-{
-  // NEW: Capture window configuration
-  uint16_t capture_start_us;              // Capture window start time in microseconds (0-500)  // 2
-  uint16_t capture_end_us;                // Capture window end time in microseconds (0-500)    // 2
-  uint16_t num_angles;                    // Actual number of angles used                       // 2
-  uint16_t num_pattern_segments;          // Actual number of segments used (0-16)              // 2
-  scan_angle_t angles[16];                // Up to 16 angles per scan                           // 356 * 16
-  char name[32];                          // 31-character scan name + null terminator           // 32 byte
-  TX7332_SEGMENT_t pattern_segments[16];  // Array of pattern segments                          // 16 byte
-  uint16_t tr_sw_del_mode;                // TR_SW_DEL_MODE flag (defaults to false)            // 2
-  uint16_t repeat_count;                  // Waveform repeat count (0-31, 5-bit field)          // 2
-  uint16_t tail_count;                    // Ground padding clocks (0-31, 5-bit field)          // 2
-  uint16_t tx_start_del;                  // TX_START_DEL value (9-bit field, 0-511)            // 2
-} scan_conf_t;
-Static_assert(sizeof(scan_conf_t)==5760,"");
-*/
+const DATA_PACKET_ANGLE_OFFSET = SIZEOF_PACKET_PREAMBLE + SIZEOF_PACKET_HEADER_T
+const DATA_PACKET_STEP_OFFSET = DATA_PACKET_ANGLE_OFFSET + 1
+const DATA_PACKET_CHANNEL_OFFSET = DATA_PACKET_STEP_OFFSET + 1
+const DATA_PACKET_FORMAT_OFFSET = DATA_PACKET_CHANNEL_OFFSET + 1
+const DATA_PACKET_CHUNK_OFFSET = DATA_PACKET_FORMAT_OFFSET + 4
 
 export interface ScanConfig {
   name: string;                    // 32-byte null-terminated string
@@ -56,27 +32,21 @@ export interface ScanConfig {
 
 export interface MetadataPacket {
   packetType: 0x01;
-  bootId: number;
   scanId: number;
-  length: number;
   scanConfig: ScanConfig;
-  crc32: number;
 }
 
 export interface DataPacket {
   packetType: 0x02;
-  bootId: number;
   scanId: number;
-  length: number;
   angleIndex: number;    // Changed from 'angle' to match C struct
   stepIndex: number;     // Changed from 'step' to match C struct  
   channelIndex: number;  // Changed from 'channel' to match C struct
+  sampleFormat: number;   
   samples: number[];     // Unpacked 10-bit ADC samples
-  crc32: number;
 }
 
 export interface ScanData {
-  bootId: number;
   scanId: number;
   metadata: MetadataPacket;
   dataPackets: Map<string, DataPacket>; // key: "angleIndex_stepIndex_channelIndex"
@@ -105,6 +75,7 @@ export class UltrasonicDataParser {
   private scans: Map<string, ScanData> = new Map(); // key: "bootId_scanId"
   private triggerMode: 'auto' | 'single' = 'auto';
 
+  // TODO: remove this
   // Sync pattern for packet alignment (fixed boot ID in little-endian)
   private static readonly SYNC_PATTERN = [0xA6, 0xA5, 0xA5, 0xA5]; // 0xA5A5A5A6 in little-endian
 
@@ -134,126 +105,164 @@ export class UltrasonicDataParser {
   }
 
   private tryParsePacket(): MetadataPacket | DataPacket | null {
-    // Look for sync pattern (boot ID: 0xA5A5A5A6) to ensure packet alignment
-    while (this.buffer.length >= 15) { // Minimum packet size
-      // Look for packet type (0x01 or 0x02) followed by sync pattern
-      if (this.buffer.length < 9) break; // Need at least 1 + 4 + 4 bytes
 
-      const packetType = this.buffer[0];
+    while (this.buffer.length >= 16) { // Minimum packet size
 
-      // Check if this looks like a valid packet start
-      if (packetType === 0x01 || packetType === 0x02) {
-        // Check if sync pattern follows at offset 1-4 (boot ID position)
-        const syncMatch = UltrasonicDataParser.SYNC_PATTERN.every((byte, index) =>
-          this.buffer.length > (1 + index) && this.buffer[1 + index] === byte
-        );
+      const view = new DataView(this.buffer.buffer, this.buffer.byteOffset);
 
-        if (syncMatch) {
-          // Found valid sync pattern, try to parse packet
-          const view = new DataView(this.buffer.buffer, this.buffer.byteOffset);
-
-          const bootId = view.getUint32(1, true); // Should be 0xA5A5A5A6
-          const scanId = view.getUint32(5, true);
-          const length = view.getUint16(9, true);
-
-          // Validate length is reasonable
-          if (length < 15 || length > 8192) {
-            this.onParseError?.(`Invalid packet length: ${length}`, this.buffer.slice(0, Math.min(32, this.buffer.length)));
-            this.buffer = this.buffer.slice(1); // Skip this byte and try again
-            continue;
-          }
-
-          // Check if we have complete packet
-          if (this.buffer.length < length) {
-            return null; // Need more data
-          }
-
-          // Extract and verify CRC
-          const packetData = this.buffer.slice(0, length);
-          const headerAndPayload = packetData.slice(0, length - 4);
-          const receivedCrc = view.getUint32(length - 4, true);
-
-          const calculatedCrc = this.calculateCRC32(headerAndPayload);
-          if (receivedCrc !== calculatedCrc) {
-            // Temporarily ignore CRC errors for testing
-            // console.log(`CRC mismatch (ignored): expected 0x${calculatedCrc.toString(16)}, got 0x${receivedCrc.toString(16)}`);
-            // Continue parsing instead of skipping
-          }
-
-          // Remove packet from buffer
-          this.buffer = this.buffer.slice(length);
-
-          // Parse based on packet type
-          if (packetType === 0x01) {
-            return this.parseMetadataPacket(packetData, view, bootId, scanId, length, receivedCrc);
-          } else if (packetType === 0x02) {
-            return this.parseDataPacket(packetData, view, bootId, scanId, length, receivedCrc);
-          }
-        }
+      const preamble = view.getUint32(0, true); // little endian
+      if (preamble !== PACKET_PREAMBLE) {
+        this.buffer = this.buffer.slice(1);
+        continue;
       }
 
-      // No valid packet found at this position, advance by 1 byte and try again
-      this.buffer = this.buffer.slice(1);
+      const typeAndScanId = view.getUint32(4, true);
+      const packetType = typeAndScanId & 0xff;
+
+      // Validate packet type
+      if (packetType !== 0x01 && packetType !== 0x02) {
+        this.onParseError?.(`Invalid packet type: 0x${packetType.toString(16)}`, this.buffer.slice(0, Math.min(32, this.buffer.length)));
+        this.buffer = this.buffer.slice(1); // Skip this byte and try again
+        continue;
+      }
+
+      const scanId = (typeAndScanId >>> 8) & 0xffffff;
+      const payloadSize = view.getUint32(8, true);
+
+      // packetSize includes header, payload, and crc but not preamble
+      const packetSize = SIZEOF_PACKET_HEADER_T + payloadSize + SIZEOF_PACKET_CRC;
+      const packetSizeWithPreamble = SIZEOF_PACKET_PREAMBLE + packetSize;
+
+      // console.log(`packetSize: ${packetSize}, payloadSize: ${payloadSize}`);
+
+      if (this.buffer.length < packetSizeWithPreamble) {
+        return null; // Need more data;
+      }
+
+      // strip off preamble as well as CRC, packetData starts from header (inclusive), ends at crc (exclusive).
+      const headerStart = SIZEOF_PACKET_PREAMBLE;
+      const crcStart = packetSizeWithPreamble - SIZEOF_PACKET_CRC;
+      const packetData = this.buffer.slice(headerStart, crcStart);
+      const receivedCrc = view.getUint32(crcStart, true);
+
+      const packetData32 = new Uint32Array(packetData.buffer, packetData.byteOffset, packetData.length / 4);
+      const calculatedCrc = stm32h7_crc32(packetData32);
+
+      if (receivedCrc !== calculatedCrc) {
+        console.log(`CRC mismatch: calculated 0x${calculatedCrc.toString(16)}, got 0x${receivedCrc.toString(16)}`);
+        this.buffer = this.buffer.slice(1);
+        continue;
+      } else {
+        // console.log(`CRC match: 0x${calculatedCrc.toString(16).toUpperCase()}`);
+      }
+
+      // remove full packet from buffer
+      this.buffer = this.buffer.slice(packetSizeWithPreamble);
+
+      if (packetType === 0x01) {
+        const configData = packetData.slice(SIZEOF_PACKET_HEADER_T, SIZEOF_PACKET_HEADER_T + SIZEOF_META_PACKET_PAYLOAD);
+        const scanConfig = this.parseScanConfig(configData);
+
+        if (scanId === 0) {
+          console.log('testing (scan id = 0) metadata packet received', scanConfig);
+          return null;
+        }
+
+        return {
+          packetType: 0x01,
+          scanId,
+          scanConfig
+        }
+      } else if (packetType === 0x02) {
+        // view is aligned with the beginning of preamble
+        const angleIndex = view.getUint8(DATA_PACKET_ANGLE_OFFSET);
+        const stepIndex = view.getUint8(DATA_PACKET_STEP_OFFSET);
+        const channelIndex = view.getUint8(DATA_PACKET_CHANNEL_OFFSET);
+        const sampleFormat = view.getUint8(DATA_PACKET_FORMAT_OFFSET);
+
+        // data is aligned with the beginning of header
+        const dataChunk = packetData.slice(SIZEOF_DATA_PACKET_HEADER_T);
+
+        // console.log(`sizeof dataChunk is ${dataChunk.length}`)
+
+        // Unpack 10-bit samples (8 samples per 10 bytes)
+        const samples = this.unpack10BitSamples(dataChunk);
+
+        if (scanId === 0) {
+          console.log('testing (scan id = 0) data packet received', {
+            angleIndex, stepIndex, channelIndex, sampleFormat, samples
+          });
+          return null;
+        }
+
+        // Validate sample count if we have scan configuration
+        if (this.currentScan && this.currentScan.metadata) {
+          const config = this.currentScan.metadata.scanConfig;
+          const expectedSamples = 20 * (config.captureEndUs - config.captureStartUs);
+
+          if (samples.length !== expectedSamples) {
+            console.warn(`Sample count mismatch: expected ${expectedSamples}, got ${samples.length} ` +
+              `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)` +
+              `(dataChunk.length: ${dataChunk.length})`);
+          }
+        }
+
+        return {
+          packetType: 0x02,
+          scanId,
+          angleIndex,
+          stepIndex,
+          channelIndex,
+          sampleFormat,
+          samples,
+        };
+      }
+
+      // Parse based on packet type
+      // if (packetType === 0x01) {
+      //   return this.parseMetadataPacket(packetData, view, bootId, scanId, length, receivedCrc);
+      // } else if (packetType === 0x02) {
+      //   return this.parseDataPacket(packetData, view, bootId, scanId, length, receivedCrc);
+      // }
     }
 
     return null; // Need more data or no valid packet found
   }
 
-  private parseMetadataPacket(packetData: Uint8Array, view: DataView, bootId: number, scanId: number, length: number, crc32: number): MetadataPacket {
-    // Metadata header is 11 bytes, CRC is 4 bytes
-    const payloadStart = 11;
-    const payloadLength = length - 15; // Exclude 11-byte header and 4-byte CRC
-    const configData = packetData.slice(payloadStart, payloadStart + payloadLength);
+  // private parseDataPacket(packetData: Uint8Array, view: DataView, bootId: number, scanId: number, length: number, crc32: number): DataPacket {
+  //   // Data header is 14 bytes: packet_type(1) + boot_id(4) + scan_id(4) + length(2) + angle_index(1) + step_index(1) + channel_index(1)
+  //   const angleIndex = view.getUint8(11);
+  //   const stepIndex = view.getUint8(12);
+  //   const channelIndex = view.getUint8(13);
 
-    // Parse scan configuration according to C struct
-    const scanConfig = this.parseScanConfig(configData);
+  //   const dataChunkStart = 14;
+  //   const dataChunkLength = length - 18; // Exclude 14-byte header and 4-byte CRC
+  //   const dataChunk = packetData.slice(dataChunkStart, dataChunkStart + dataChunkLength);
 
-    return {
-      packetType: 0x01,
-      bootId,
-      scanId,
-      length,
-      scanConfig,
-      crc32
-    };
-  }
+  //   // Unpack 10-bit samples (8 samples per 10 bytes)
+  //   const samples = this.unpack10BitSamples(dataChunk);
 
-  private parseDataPacket(packetData: Uint8Array, view: DataView, bootId: number, scanId: number, length: number, crc32: number): DataPacket {
-    // Data header is 14 bytes: packet_type(1) + boot_id(4) + scan_id(4) + length(2) + angle_index(1) + step_index(1) + channel_index(1)
-    const angleIndex = view.getUint8(11);
-    const stepIndex = view.getUint8(12);
-    const channelIndex = view.getUint8(13);
+  //   // Validate sample count if we have scan configuration
+  //   if (this.currentScan && this.currentScan.metadata) {
+  //     const config = this.currentScan.metadata.scanConfig;
+  //     const expectedSamples = 20 * (config.captureEndUs - config.captureStartUs);
 
-    const dataChunkStart = 14;
-    const dataChunkLength = length - 18; // Exclude 14-byte header and 4-byte CRC
-    const dataChunk = packetData.slice(dataChunkStart, dataChunkStart + dataChunkLength);
+  //     if (samples.length !== expectedSamples) {
+  //       console.warn(`Sample count mismatch: expected ${expectedSamples}, got ${samples.length} ` +
+  //         `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)` +
+  //         `(dataChunkLength: ${dataChunkLength})`);
+  //     }
+  //   }
 
-    // Unpack 10-bit samples (8 samples per 10 bytes)
-    const samples = this.unpack10BitSamples(dataChunk);
-
-    // Validate sample count if we have scan configuration
-    if (this.currentScan && this.currentScan.metadata) {
-      const config = this.currentScan.metadata.scanConfig;
-      const expectedSamples = 20 * (config.captureEndUs - config.captureStartUs);
-
-      if (samples.length !== expectedSamples) {
-        console.warn(`Sample count mismatch: expected ${expectedSamples}, got ${samples.length} ` +
-          `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)`);
-      }
-    }
-
-    return {
-      packetType: 0x02,
-      bootId,
-      scanId,
-      length,
-      angleIndex,
-      stepIndex,
-      channelIndex,
-      samples,
-      crc32
-    };
-  }
+  //   return {
+  //     packetType: 0x02,
+  //     scanId,
+  //     angleIndex,
+  //     stepIndex,
+  //     channelIndex,
+  //     samples,
+  //   };
+  // }
 
   private parseScanConfig(configData: Uint8Array): ScanConfig {
     if (configData.length < 5760) {
@@ -349,60 +358,28 @@ export class UltrasonicDataParser {
   }
 
   private extract8SamplesFrom10Bytes(bytes: Uint8Array): number[] {
-    // Bit-packed 10-bit samples: 8 samples in 10 bytes (80 bits total)
-    const samples: number[] = [];
-
-    for (let i = 0; i < 8; i++) {
-      const bitOffset = i * 10;
-      const byteOffset = Math.floor(bitOffset / 8);
-      const bitInByte = bitOffset % 8;
-
-      let sample = 0;
-
-      // Read 10 bits, potentially spanning 2 bytes
-      if (bitInByte <= 6) {
-        // Sample fits within 2 bytes
-        const byte1 = bytes[byteOffset];
-        const byte2 = byteOffset + 1 < bytes.length ? bytes[byteOffset + 1] : 0;
-
-        sample = ((byte2 << 8) | byte1) >> bitInByte;
-        sample &= 0x3FF; // Mask to 10 bits
-      } else {
-        // Sample spans 3 bytes (rare case when bitInByte > 6)
-        const byte1 = bytes[byteOffset];
-        const byte2 = byteOffset + 1 < bytes.length ? bytes[byteOffset + 1] : 0;
-        const byte3 = byteOffset + 2 < bytes.length ? bytes[byteOffset + 2] : 0;
-
-        sample = ((byte3 << 16) | (byte2 << 8) | byte1) >> bitInByte;
-        sample &= 0x3FF; // Mask to 10 bits
-      }
-
-      samples.push(sample);
-
-      return samples.map((n: number) => {
-        if ((n & 0x200) === 0) {
-          return n - 512;
-        }
-        else {
-          return n - 512;
-        }
-      })
-    }
-
-    return samples;
+    const s0 = ((bytes[0] + bytes[1] * 256) >>> 0) & 0x000003ff
+    const s1 = ((bytes[1] + bytes[2] * 256) >>> 2) & 0x000003ff
+    const s2 = ((bytes[2] + bytes[3] * 256) >>> 4) & 0x000003ff
+    const s3 = ((bytes[3] + bytes[4] * 256) >>> 6) & 0x000003ff
+    const s4 = ((bytes[5] + bytes[6] * 256) >>> 0) & 0x000003ff
+    const s5 = ((bytes[6] + bytes[7] * 256) >>> 2) & 0x000003ff
+    const s6 = ((bytes[7] + bytes[8] * 256) >>> 4) & 0x000003ff
+    const s7 = ((bytes[8] + bytes[9] * 256) >>> 6) & 0x000003ff
+    return [s0, s1, s2, s3, s4, s5, s6, s7].map(x => x - 512)
   }
 
   private handlePacket(packet: MetadataPacket | DataPacket): void {
-    const scanKey = `${packet.bootId}_${packet.scanId}`;
+    const scanKey = `${packet.scanId}`;
 
     if (packet.packetType === 0x01) {
       // Metadata packet - start new scan
       const metadata = packet as MetadataPacket;
 
-      // Check for device reboot
-      if (this.currentScan && this.currentScan.bootId !== packet.bootId) {
-        this.onDeviceReboot?.(packet.bootId, this.currentScan.bootId);
-      }
+      // // Check for device reboot
+      // if (this.currentScan && this.currentScan.bootId !== packet.bootId) {
+      //   this.onDeviceReboot?.(packet.bootId, this.currentScan.bootId);
+      // }
 
       // In single mode, clear previous scan when starting new one
       if (this.triggerMode === 'single') {
@@ -410,7 +387,6 @@ export class UltrasonicDataParser {
       }
 
       this.currentScan = {
-        bootId: packet.bootId,
         scanId: packet.scanId,
         metadata,
         dataPackets: new Map(),
@@ -507,8 +483,6 @@ export class UltrasonicDataParser {
       // console.log(`⏳ Scan ${progressPercent}% complete (${scan.dataPackets.size}/${totalExpectedPackets} packets)`);
     }
   }
-
-
 
   private calculateCRC32(data: Uint8Array): number {
     // Standard IEEE 802.3 CRC-32 (original implementation)
@@ -611,4 +585,3 @@ export class UltrasonicDataParser {
     this.buffer = new Uint8Array(0);
   }
 }
-

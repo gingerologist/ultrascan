@@ -935,9 +935,8 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         nameLocation: 'middle',
         nameGap: 50,
         scale: true,
-        min: 'dataMin',
-        max: 'dataMax',
-        boundaryGap: ['5%', '5%'],
+        min: -512,
+        max: 512,
         startFromZero: true
       },
       dataZoom: [
@@ -1144,9 +1143,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       const scan = scanToDisplay;
       const metadata = scan.metadata;
 
-      if (this.bootIdEl) {
-        this.bootIdEl.textContent = `0x${scan.bootId.toString(16).toUpperCase().padStart(8, '0')}`;
-      }
       if (this.scanIdEl) {
         this.scanIdEl.textContent = scan.scanId.toString();
       }

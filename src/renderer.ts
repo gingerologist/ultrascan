@@ -4,6 +4,10 @@ export { }; // Make this file a module
 import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
 import * as echarts from 'echarts';
 
+import { saveScanData } from './saveScanData'
+
+
+
 // Web Serial API type definitions
 declare global {
   interface Navigator {
@@ -170,7 +174,7 @@ class UltrasonicScannerInterface {
   // NEW: Initialize channel selection functionality
   private initializeChannelSelection(): void {
     console.log('📋 Initializing channel selection grid');
-    
+
     if (!this.channelGrid) {
       console.error('Channel grid element not found');
       return;
@@ -183,23 +187,23 @@ class UltrasonicScannerInterface {
     for (let channel = 0; channel < 64; channel++) {
       const channelItem = document.createElement('div');
       channelItem.className = 'channel-item selected'; // Start with all selected
-      
+
       const label = document.createElement('label');
       label.textContent = `CH${channel}`;
       label.setAttribute('for', `channel_${channel}`);
-      
+
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.id = `channel_${channel}`;
       checkbox.checked = true; // Start with all checked
       checkbox.dataset.channel = channel.toString();
-      
+
       // Add event listener for individual channel checkboxes
       checkbox.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
         this.handleChannelCheckboxChange(parseInt(target.dataset.channel!), target.checked);
       });
-      
+
       channelItem.appendChild(label);
       channelItem.appendChild(checkbox);
       this.channelGrid.appendChild(channelItem);
@@ -215,14 +219,14 @@ class UltrasonicScannerInterface {
 
     // Update initial summary
     this.updateSelectionSummary();
-    
+
     console.log('📋 Channel selection grid initialized with 64 channels');
   }
 
   // NEW: Handle individual channel checkbox changes
   private handleChannelCheckboxChange(channel: number, isChecked: boolean): void {
     console.log(`📋 Channel ${channel} ${isChecked ? 'selected' : 'deselected'}`);
-    
+
     // Update selected channels set
     if (isChecked) {
       this.selectedChannels.add(channel);
@@ -242,10 +246,10 @@ class UltrasonicScannerInterface {
 
     // Update check-all checkbox state
     this.updateCheckAllState();
-    
+
     // Update selection summary
     this.updateSelectionSummary();
-    
+
     // Update chart if data is available
     if (this.displayScanData && this.chart) {
       this.updateChart();
@@ -255,15 +259,15 @@ class UltrasonicScannerInterface {
   // NEW: Handle check-all checkbox changes
   private handleCheckAllChange(isChecked: boolean): void {
     console.log(`📋 Check all channels: ${isChecked}`);
-    
+
     // Update all individual checkboxes
     for (let channel = 0; channel < 64; channel++) {
       const checkbox = document.getElementById(`channel_${channel}`) as HTMLInputElement;
       const channelItem = checkbox?.parentElement;
-      
+
       if (checkbox && checkbox.checked !== isChecked) {
         checkbox.checked = isChecked;
-        
+
         // Update visual state
         if (channelItem) {
           if (isChecked) {
@@ -279,7 +283,7 @@ class UltrasonicScannerInterface {
 
     // Update selection summary
     this.updateSelectionSummary();
-    
+
     // Update chart if data is available
     if (this.displayScanData && this.chart) {
       this.updateChart();
@@ -291,7 +295,7 @@ class UltrasonicScannerInterface {
     if (!this.checkAllChannels) return;
 
     const selectedCount = this.selectedChannels.size;
-    
+
     if (selectedCount === 64) {
       // All channels selected
       this.checkAllChannels.checked = true;
@@ -313,11 +317,11 @@ class UltrasonicScannerInterface {
 
     const selectedCount = this.selectedChannels.size;
     const countSpan = this.selectionSummary.querySelector('.count');
-    
+
     if (countSpan) {
       countSpan.textContent = selectedCount.toString();
     }
-    
+
     // Update summary text color based on selection
     if (selectedCount === 0) {
       this.selectionSummary.style.backgroundColor = '#ffebee';
@@ -717,6 +721,13 @@ class UltrasonicScannerInterface {
 
   private handleScanComplete(scan: ScanData): void {
     console.log('Scan complete:', scan);
+
+    try {
+      saveScanData(scan);
+    } catch (error) {
+      console.error('Failed to save scan data: ', error)
+    }
+
     this.scanCount++;
     this.displayScanData = scan;
 

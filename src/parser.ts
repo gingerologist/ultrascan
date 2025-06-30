@@ -77,7 +77,7 @@ export class UltrasonicDataParser {
 
   // TODO: remove this
   // Sync pattern for packet alignment (fixed boot ID in little-endian)
-  private static readonly SYNC_PATTERN = [0xA6, 0xA5, 0xA5, 0xA5]; // 0xA5A5A5A6 in little-endian
+  // private static readonly SYNC_PATTERN = [0xA6, 0xA5, 0xA5, 0xA5]; // 0xA5A5A5A6 in little-endian
 
   // Callbacks for events
   public onMetadataReceived?: (metadata: MetadataPacket) => void;
@@ -217,52 +217,10 @@ export class UltrasonicDataParser {
           samples,
         };
       }
-
-      // Parse based on packet type
-      // if (packetType === 0x01) {
-      //   return this.parseMetadataPacket(packetData, view, bootId, scanId, length, receivedCrc);
-      // } else if (packetType === 0x02) {
-      //   return this.parseDataPacket(packetData, view, bootId, scanId, length, receivedCrc);
-      // }
     }
 
     return null; // Need more data or no valid packet found
   }
-
-  // private parseDataPacket(packetData: Uint8Array, view: DataView, bootId: number, scanId: number, length: number, crc32: number): DataPacket {
-  //   // Data header is 14 bytes: packet_type(1) + boot_id(4) + scan_id(4) + length(2) + angle_index(1) + step_index(1) + channel_index(1)
-  //   const angleIndex = view.getUint8(11);
-  //   const stepIndex = view.getUint8(12);
-  //   const channelIndex = view.getUint8(13);
-
-  //   const dataChunkStart = 14;
-  //   const dataChunkLength = length - 18; // Exclude 14-byte header and 4-byte CRC
-  //   const dataChunk = packetData.slice(dataChunkStart, dataChunkStart + dataChunkLength);
-
-  //   // Unpack 10-bit samples (8 samples per 10 bytes)
-  //   const samples = this.unpack10BitSamples(dataChunk);
-
-  //   // Validate sample count if we have scan configuration
-  //   if (this.currentScan && this.currentScan.metadata) {
-  //     const config = this.currentScan.metadata.scanConfig;
-  //     const expectedSamples = 20 * (config.captureEndUs - config.captureStartUs);
-
-  //     if (samples.length !== expectedSamples) {
-  //       console.warn(`Sample count mismatch: expected ${expectedSamples}, got ${samples.length} ` +
-  //         `(capture window: ${config.captureStartUs}-${config.captureEndUs}μs)` +
-  //         `(dataChunkLength: ${dataChunkLength})`);
-  //     }
-  //   }
-
-  //   return {
-  //     packetType: 0x02,
-  //     scanId,
-  //     angleIndex,
-  //     stepIndex,
-  //     channelIndex,
-  //     samples,
-  //   };
-  // }
 
   private parseScanConfig(configData: Uint8Array): ScanConfig {
     if (configData.length < 5760) {
@@ -270,19 +228,6 @@ export class UltrasonicDataParser {
     }
 
     const view = new DataView(configData.buffer, configData.byteOffset);
-
-    // Struct layout with exact byte offsets:
-    // capture_start_us: 0-1 (uint16_t)
-    // capture_end_us: 2-3 (uint16_t)  
-    // num_angles: 4-5 (uint16_t)
-    // num_pattern_segments: 6-7 (uint16_t)
-    // angles[16]: 8-5703 (16 × 356 bytes)
-    // name[32]: 5704-5735 (32 bytes)
-    // pattern_segments[16]: 5736-5751 (16 × 1 byte)
-    // tr_sw_del_mode: 5752-5753 (uint16_t)
-    // repeat_count: 5754-5755 (uint16_t)
-    // tail_count: 5756-5757 (uint16_t)
-    // tx_start_del: 5758-5759 (uint16_t)
 
     // Read basic fields
     const captureStartUs = view.getUint16(0, true);

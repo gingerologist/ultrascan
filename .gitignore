@@ -90,3 +90,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# scan data output
+/data

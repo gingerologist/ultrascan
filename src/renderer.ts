@@ -6,8 +6,6 @@ import * as echarts from 'echarts';
 
 import { saveScanData } from './saveScanData'
 
-
-
 // Web Serial API type definitions
 declare global {
   interface Navigator {

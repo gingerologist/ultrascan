@@ -6,7 +6,7 @@ const SIZEOF_PACKET_PREAMBLE = 4
 const SIZEOF_PACKET_HEADER_T = 8
 const SIZEOF_DATA_PACKET_HEADER_T = SIZEOF_PACKET_HEADER_T + 4
 const SIZEOF_PACKET_CRC = 4
-const SIZEOF_META_PACKET_PAYLOAD = 5760 // size of scan_conf_t
+const SIZEOF_META_PACKET_PAYLOAD = 5760 + 12 // size of scan_conf_t TODO: why we need to hardcode this?
 
 const DATA_PACKET_ANGLE_OFFSET = SIZEOF_PACKET_PREAMBLE + SIZEOF_PACKET_HEADER_T
 const DATA_PACKET_STEP_OFFSET = DATA_PACKET_ANGLE_OFFSET + 1
@@ -14,6 +14,11 @@ const DATA_PACKET_CHANNEL_OFFSET = DATA_PACKET_STEP_OFFSET + 1
 const DATA_PACKET_FORMAT_OFFSET = DATA_PACKET_CHANNEL_OFFSET + 1
 const DATA_PACKET_CHUNK_OFFSET = DATA_PACKET_FORMAT_OFFSET + 4
 
+/**
+ * Data Structure of Scan Configuration.
+ * 
+ * @interface
+ */
 export interface ScanConfig {
   name: string;                    // 32-byte null-terminated string
   patternSegments: any[];          // 16 segments - structure TBD
@@ -28,6 +33,10 @@ export interface ScanConfig {
   numAngles: number;               // Actual number of angles used
   totalSteps?: number;             // Total steps across all angles
   // Note: Samples per packet = 20 × (captureEndUs - captureStartUs) due to 20MHz ADC clock
+
+  bfClk: number;
+  adcClk: number;
+  baseline: boolean;
 }
 
 export interface MetadataPacket {
@@ -68,6 +77,9 @@ export const stm32h7_crc32 = (data: Uint32Array): number => {
   return (crc32 >>> 0);
 }
 
+/**
+ * @class
+ */
 export class UltrasonicDataParser {
   private buffer: Uint8Array = new Uint8Array(0);
   private currentScan: ScanData | null = null;
@@ -222,9 +234,15 @@ export class UltrasonicDataParser {
     return null; // Need more data or no valid packet found
   }
 
+  /**
+   * 
+   * 
+   * @param configData 
+   * @returns 
+   */
   private parseScanConfig(configData: Uint8Array): ScanConfig {
-    if (configData.length < 5760) {
-      throw new Error(`Scan config too short: ${configData.length} bytes, expected 5760`);
+    if (configData.length < SIZEOF_META_PACKET_PAYLOAD) {
+      throw new Error(`Scan config too short: ${configData.length} bytes, expected ${SIZEOF_META_PACKET_PAYLOAD}`);
     }
 
     const view = new DataView(configData.buffer, configData.byteOffset);
@@ -244,6 +262,9 @@ export class UltrasonicDataParser {
     const repeatCount = view.getUint16(5754, true);
     const tailCount = view.getUint16(5756, true);
     const txStartDel = view.getUint16(5758, true);
+    const bfClk = view.getUint32(5760, true);
+    const adcClk = view.getUint32(5764, true);
+    const baseline = ((view.getUint32(5768, true) >>> 0) & 1) === 1;
 
     // Parse angles array to get num_steps for each angle
     const angles: any[] = [];
@@ -267,8 +288,9 @@ export class UltrasonicDataParser {
       console.log(`📊 Angle ${i}: ${numSteps} steps, label: "${label}"`);
     }
 
-    console.log(`📊 Total steps across ${numAngles} angles: ${totalSteps}`);
-    console.log(`📊 Expected packets: ${totalSteps} steps × 64 channels = ${totalSteps * 64}`);
+    console.log(`Total steps across ${numAngles} angles: ${totalSteps}`);
+    console.log(`Baseline mode is ${baseline ? 'on' : 'off'}`);
+    console.log(`Expected packets: ${totalSteps} steps × ${(baseline ? 65 : 64)} channels = ${totalSteps * (baseline ? 65 : 64)}`);
 
     return {
       name,
@@ -282,7 +304,11 @@ export class UltrasonicDataParser {
       captureEndUs,
       angles,
       numAngles,
-      totalSteps // Add this for easy access in checkScanComplete
+      totalSteps, // Add this for easy access in checkScanComplete
+
+      bfClk,
+      adcClk,
+      baseline
     };
   }
 
@@ -376,14 +402,14 @@ export class UltrasonicDataParser {
     const totalExpectedSteps = config.totalSteps || expectedStepsPerAngle.reduce((sum, steps) => sum + steps, 0);
 
     // Each step is transmitted on 64 channels (0-63)
-    const expectedChannels = 64;
+    const expectedChannels = config.baseline ? 65 : 64;
     const totalExpectedPackets = totalExpectedSteps * expectedChannels;
 
-    // console.log(`📊 Scan completion check:`);
-    // console.log(`   Expected: ${expectedAngles} angles, ${totalExpectedSteps} total steps, ${expectedChannels} channels`);
-    // console.log(`   Expected packets: ${totalExpectedPackets}`);
-    // console.log(`   Received packets: ${scan.dataPackets.size}`);
-    // console.log(`   Progress: ${((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1)}%`);
+    console.log(`Scan completion check:`);
+    console.log(`   Expected: ${expectedAngles} angles, ${totalExpectedSteps} total steps, ${expectedChannels} channels`);
+    console.log(`   Expected packets: ${totalExpectedPackets}`);
+    console.log(`   Received packets: ${scan.dataPackets.size}`);
+    console.log(`   Progress: ${((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1)}%`);
 
     // Only mark complete when we have received ALL expected packets
     if (scan.dataPackets.size >= totalExpectedPackets) {
@@ -407,6 +433,7 @@ export class UltrasonicDataParser {
       console.log(`📊 Received ranges: angles 0-${maxAngleReceived}, steps 0-${maxStepReceived}, channels 0-${maxChannelReceived}`);
 
       // Verify we received data for all expected ranges
+      // TODO: these code are verbose. need clean.
       const hasAllAngles = maxAngleReceived >= (expectedAngles - 1);
       const hasAllChannels = maxChannelReceived >= 63; // Channels should be 0-63
 
@@ -423,9 +450,7 @@ export class UltrasonicDataParser {
         console.log(`⏳ Scan not complete yet - missing ranges. All angles: ${hasAllAngles}, All channels: ${hasAllChannels}`);
       }
     } else {
-      // Calculate percentage for progress display
       const progressPercent = ((scan.dataPackets.size / totalExpectedPackets) * 100).toFixed(1);
-      // console.log(`⏳ Scan ${progressPercent}% complete (${scan.dataPackets.size}/${totalExpectedPackets} packets)`);
     }
   }
 

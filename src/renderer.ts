@@ -1,14 +1,13 @@
 export { }; // Make this file a module
 
-import * as Bonjour from 'bonjour';
+// import * as Bonjour from 'bonjour';
 
-// Import the parser and ECharts
 import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
 import * as echarts from 'echarts';
 
 import { saveScanData } from './saveScanData'
 
-const bonjour = Bonjour.default();
+// const bonjour = Bonjour.default();
 
 setTimeout(() => {
   bonjour.find({ type: 'sonic' }, (service) => {

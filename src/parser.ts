@@ -51,7 +51,7 @@ export interface DataPacket {
   angleIndex: number;    // Changed from 'angle' to match C struct
   stepIndex: number;     // Changed from 'step' to match C struct  
   channelIndex: number;  // Changed from 'channel' to match C struct
-  sampleFormat: number;   
+  sampleFormat: number;
   samples: number[];     // Unpacked 10-bit ADC samples
 }
 

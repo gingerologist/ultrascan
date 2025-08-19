@@ -1,10 +1,20 @@
 export { }; // Make this file a module
 
+import * as Bonjour from 'bonjour';
+
 // Import the parser and ECharts
 import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
 import * as echarts from 'echarts';
 
 import { saveScanData } from './saveScanData'
+
+const bonjour = Bonjour.default();
+
+setTimeout(() => {
+  bonjour.find({ type: 'sonic' }, (service) => {
+    console.log('Found:', service);
+  })
+}, 5000);
 
 // Web Serial API type definitions
 declare global {
@@ -45,6 +55,12 @@ declare global {
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 class UltrasonicScannerInterface {
+  // Add these new properties:
+  private baselineCheckbox: HTMLInputElement;
+  private baselineEnabled: boolean = false;
+  private showBaseline: boolean = false;
+  private totalChannels: number = 64; // Will be 64 or 65 based on config
+
   // Serial port management
   private portSelect: HTMLSelectElement;
   private connectButton: HTMLButtonElement;
@@ -150,6 +166,7 @@ class UltrasonicScannerInterface {
     // NEW: Channel selection elements
     this.channelSelectionContainer = document.getElementById('channelSelectionContainer') as HTMLElement;
     this.checkAllChannels = document.getElementById('checkAllChannels') as HTMLInputElement;
+    this.baselineCheckbox = document.getElementById('baselineCheckbox') as HTMLInputElement;
     this.channelGrid = document.getElementById('channelGrid') as HTMLElement;
     this.selectionSummary = document.getElementById('selectionSummary') as HTMLElement;
 
@@ -162,14 +179,40 @@ class UltrasonicScannerInterface {
     if (!this.connectionStatus) missingElements.push('connectionStatus');
     if (!this.runStopButton) missingElements.push('runStopButton');
     if (!this.chartContainer) missingElements.push('chartContainer');
-    if (!this.channelSelectionContainer) missingElements.push('channelSelectionContainer'); // NEW
+    if (!this.channelSelectionContainer) missingElements.push('channelSelectionContainer');
+    if (!this.baselineCheckbox) missingElements.push('baselineCheckbox');
 
     if (missingElements.length > 0) {
       console.error('Missing HTML elements:', missingElements.join(', '));
     }
   }
 
-  // NEW: Initialize channel selection functionality
+  // 6. Helper method to create channel checkbox
+  private createChannelCheckbox(channel: number, isChecked: boolean): void {
+    const channelItem = document.createElement('div');
+    channelItem.className = isChecked ? 'channel-item selected' : 'channel-item';
+
+    const label = document.createElement('label');
+    label.textContent = `CH${channel}`;
+    label.setAttribute('for', `channel_${channel}`);
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `channel_${channel}`;
+    checkbox.checked = isChecked;
+    checkbox.dataset.channel = channel.toString();
+
+    checkbox.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      this.handleChannelCheckboxChange(parseInt(target.dataset.channel!), target.checked);
+    });
+
+    channelItem.appendChild(label);
+    channelItem.appendChild(checkbox);
+    this.channelGrid.appendChild(channelItem);
+  }
+
+  // 5. Update initializeChannelSelection() to support 65 channels
   private initializeChannelSelection(): void {
     console.log('📋 Initializing channel selection grid');
 
@@ -181,33 +224,20 @@ class UltrasonicScannerInterface {
     // Clear existing content
     this.channelGrid.innerHTML = '';
 
-    // Create 64 channel checkboxes arranged in 4 rows × 16 columns
+    // Create checkboxes for regular channels (0-63)
     for (let channel = 0; channel < 64; channel++) {
-      const channelItem = document.createElement('div');
-      channelItem.className = 'channel-item selected'; // Start with all selected
-
-      const label = document.createElement('label');
-      label.textContent = `CH${channel}`;
-      label.setAttribute('for', `channel_${channel}`);
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.id = `channel_${channel}`;
-      checkbox.checked = true; // Start with all checked
-      checkbox.dataset.channel = channel.toString();
-
-      // Add event listener for individual channel checkboxes
-      checkbox.addEventListener('change', (e) => {
-        const target = e.target as HTMLInputElement;
-        this.handleChannelCheckboxChange(parseInt(target.dataset.channel!), target.checked);
-      });
-
-      channelItem.appendChild(label);
-      channelItem.appendChild(checkbox);
-      this.channelGrid.appendChild(channelItem);
+      this.createChannelCheckbox(channel, true);
     }
 
-    // Initialize check-all checkbox event listener
+    // Add baseline checkbox event listener
+    if (this.baselineCheckbox) {
+      this.baselineCheckbox.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        this.handleBaselineCheckboxChange(target.checked);
+      });
+    }
+
+    // Initialize check-all checkbox event listener (existing code)
     if (this.checkAllChannels) {
       this.checkAllChannels.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
@@ -215,10 +245,21 @@ class UltrasonicScannerInterface {
       });
     }
 
-    // Update initial summary
+    this.updateSelectionSummary();
+    console.log('📋 Channel selection grid initialized with 64 channels + baseline');
+  }
+
+    // 7. New method to handle baseline checkbox changes
+  private handleBaselineCheckboxChange(isChecked: boolean): void {
+    console.log(`📋 Baseline ${isChecked ? 'enabled' : 'disabled'}`);
+    
+    this.showBaseline = isChecked;
     this.updateSelectionSummary();
 
-    console.log('📋 Channel selection grid initialized with 64 channels');
+    // Update chart if data is available
+    if (this.displayScanData && this.chart) {
+      this.updateChart();
+    }
   }
 
   // NEW: Handle individual channel checkbox changes
@@ -254,11 +295,11 @@ class UltrasonicScannerInterface {
     }
   }
 
-  // NEW: Handle check-all checkbox changes
+ // 8. Update handleCheckAllChange to only affect regular channels (0-63)
   private handleCheckAllChange(isChecked: boolean): void {
-    console.log(`📋 Check all channels: ${isChecked}`);
+    console.log(`📋 Check all regular channels: ${isChecked}`);
 
-    // Update all individual checkboxes
+    // Update all regular channel checkboxes (0-63 only)
     for (let channel = 0; channel < 64; channel++) {
       const checkbox = document.getElementById(`channel_${channel}`) as HTMLInputElement;
       const channelItem = checkbox?.parentElement;
@@ -266,7 +307,6 @@ class UltrasonicScannerInterface {
       if (checkbox && checkbox.checked !== isChecked) {
         checkbox.checked = isChecked;
 
-        // Update visual state
         if (channelItem) {
           if (isChecked) {
             channelItem.classList.add('selected');
@@ -279,10 +319,8 @@ class UltrasonicScannerInterface {
       }
     }
 
-    // Update selection summary
     this.updateSelectionSummary();
 
-    // Update chart if data is available
     if (this.displayScanData && this.chart) {
       this.updateChart();
     }
@@ -309,22 +347,28 @@ class UltrasonicScannerInterface {
     }
   }
 
-  // NEW: Update selection summary display
+  // 9. Update updateSelectionSummary to include baseline
   private updateSelectionSummary(): void {
     if (!this.selectionSummary) return;
 
     const selectedCount = this.selectedChannels.size;
-    const countSpan = this.selectionSummary.querySelector('.count');
+    const baselineText = this.showBaseline && this.baselineEnabled ? ' + Baseline' : '';
+    const totalSelected = selectedCount + (this.showBaseline && this.baselineEnabled ? 1 : 0);
+    const maxChannels = 64 + (this.baselineEnabled ? 1 : 0);
 
+    const countSpan = this.selectionSummary.querySelector('.count');
     if (countSpan) {
-      countSpan.textContent = selectedCount.toString();
+      countSpan.textContent = totalSelected.toString();
     }
 
-    // Update summary text color based on selection
-    if (selectedCount === 0) {
+    // Update text content
+    this.selectionSummary.innerHTML = `Selected: <span class="count">${totalSelected}</span> of ${maxChannels} channels${baselineText}`;
+
+    // Update colors based on selection
+    if (totalSelected === 0) {
       this.selectionSummary.style.backgroundColor = '#ffebee';
       this.selectionSummary.style.borderColor = '#f8bbd9';
-    } else if (selectedCount < 64) {
+    } else if (totalSelected < maxChannels) {
       this.selectionSummary.style.backgroundColor = '#fff3e0';
       this.selectionSummary.style.borderColor = '#ffcc80';
     } else {
@@ -720,6 +764,10 @@ class UltrasonicScannerInterface {
   private handleScanComplete(scan: ScanData): void {
     console.log('Scan complete:', scan);
 
+    // Process baseline configuration
+    const hasBaseline = scan.metadata.scanConfig.baseline === true;
+    this.updateBaselineAvailability(hasBaseline);    
+
     try {
       saveScanData(scan);
     } catch (error) {
@@ -738,6 +786,30 @@ class UltrasonicScannerInterface {
     this.populateSelectors(scan.metadata.scanConfig);
     this.showChartControls(() => { this.updateChart(); });
   }
+
+  // 11. New method to update baseline availability
+  private updateBaselineAvailability(hasBaseline: boolean): void {
+    this.baselineEnabled = hasBaseline;
+    
+    if (this.baselineCheckbox) {
+      this.baselineCheckbox.disabled = !hasBaseline;
+      
+      // Update label styling
+      const label = this.baselineCheckbox.parentElement as HTMLLabelElement;
+      if (label) {
+        if (hasBaseline) {
+          label.classList.remove('disabled');
+        } else {
+          label.classList.add('disabled');
+          this.baselineCheckbox.checked = false;
+          this.showBaseline = false;
+        }
+      }
+    }
+
+    console.log(`📋 Baseline availability updated: ${hasBaseline ? 'enabled' : 'disabled'}`);
+    this.updateSelectionSummary();
+  }  
 
   private displayScanConfiguration(config: any): void {
     if (!this.scanConfigDisplay || !this.scanConfigText) return;
@@ -1001,7 +1073,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
   }
 
   // MODIFIED: Update chart to only show selected channels
-  private updateChart(): void {
+  private updateChart2(): void {
     if (!this.chart || !this.displayScanData || !this.angleSelect || !this.stepSelect) {
       console.warn('📊 Cannot update chart: missing dependencies');
       return;
@@ -1092,6 +1164,114 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
       // Show warning if no data available for selected channels
       if (channelsWithData === 0 && this.selectedChannels.size > 0) {
+        console.warn(`📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`);
+      }
+    } catch (error) {
+      console.error('📊 Failed to update chart:', error);
+    }
+  }
+
+  // 12. Update updateChart to include baseline data when selected
+  private updateChart(): void {
+    if (!this.chart || !this.displayScanData || !this.angleSelect || !this.stepSelect) {
+      console.warn('📊 Cannot update chart: missing dependencies');
+      return;
+    }
+
+    const angleIndex = parseInt(this.angleSelect.value) || 0;
+    const stepIndex = parseInt(this.stepSelect.value) || 0;
+
+    console.log(`📊 Updating chart for angle ${angleIndex}, step ${stepIndex}`);
+    console.log(`📊 Selected channels: ${this.selectedChannels.size}/64, baseline: ${this.showBaseline && this.baselineEnabled}`);
+
+    const series: any[] = [];
+    let maxSamples = 0;
+    let channelsWithData = 0;
+
+    // Process regular channels (0-63)
+    for (let channel = 0; channel < 64; channel++) {
+      if (!this.selectedChannels.has(channel)) {
+        continue;
+      }
+
+      const dataKey = `${angleIndex}_${stepIndex}_${channel}`;
+      const packet = this.displayScanData.dataPackets.get(dataKey);
+
+      const hasData = packet && packet.samples && packet.samples.length > 0;
+      const data = hasData ? packet.samples : [];
+
+      if (hasData) {
+        maxSamples = Math.max(maxSamples, data.length);
+        channelsWithData++;
+
+        series.push({
+          name: `Channel ${channel}`,
+          type: 'line',
+          data: data,
+          symbol: 'none',
+          lineStyle: {
+            width: 1.5,
+            opacity: 0.8
+          },
+          itemStyle: {
+            color: this.getChannelColor(channel)
+          },
+          legendHoverLink: true
+        });
+      }
+    }
+
+    // Process baseline channel (64) if enabled and selected
+    if (this.showBaseline && this.baselineEnabled) {
+      const baselineKey = `${angleIndex}_${stepIndex}_64`;
+      const baselinePacket = this.displayScanData.dataPackets.get(baselineKey);
+
+      const hasBaselineData = baselinePacket && baselinePacket.samples && baselinePacket.samples.length > 0;
+      const baselineData = hasBaselineData ? baselinePacket.samples : [];
+
+      if (hasBaselineData) {
+        maxSamples = Math.max(maxSamples, baselineData.length);
+        channelsWithData++;
+
+        series.push({
+          name: 'Baseline',
+          type: 'line',
+          data: baselineData,
+          symbol: 'none',
+          lineStyle: {
+            width: 2, // Slightly thicker for baseline
+            opacity: 0.9,
+            type: 'dashed' // Dashed line to distinguish baseline
+          },
+          itemStyle: {
+            color: '#ff4444' // Red color for baseline
+          },
+          legendHoverLink: true
+        });
+      }
+    }
+
+    const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
+    const totalSelected = this.selectedChannels.size + (this.showBaseline && this.baselineEnabled ? 1 : 0);
+
+    console.log(`📊 Chart update: ${channelsWithData}/${totalSelected} selected channels have data, max samples: ${maxSamples}`);
+
+    try {
+      this.chart.setOption({
+        title: {
+          text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/${totalSelected} selected)`
+        },
+        xAxis: {
+          data: xAxisData
+        },
+        series: series
+      }, {
+        replaceMerge: 'series'
+      });
+
+      console.log('📊 Chart updated successfully');
+
+      if (channelsWithData === 0 && totalSelected > 0) {
         console.warn(`📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`);
       }
     } catch (error) {

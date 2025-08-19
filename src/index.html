@@ -412,6 +412,9 @@
         .check-all-controls {
             display: flex;
             align-items: center;
+            justify-content: flex-start;
+            gap: 20px;
+            /* Add spacing between checkboxes */
             margin-bottom: 15px;
             padding: 10px;
             background-color: #f8f9fa;
@@ -432,6 +435,16 @@
             width: 16px;
             height: 16px;
             cursor: pointer;
+        }
+
+        .check-all-controls label.disabled {
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .check-all-controls input[type="checkbox"]:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
         }
 
         /* Channel Grid */
@@ -509,12 +522,12 @@
             .channel-grid {
                 grid-template-columns: repeat(4, 1fr);
             }
-            
+
             .channel-item {
                 min-height: 45px;
                 padding: 6px 2px;
             }
-            
+
             .channel-item label {
                 font-size: 10px;
             }
@@ -620,14 +633,19 @@
         <!-- Channel Selection Container (NEW) -->
         <div id="channelSelectionContainer" class="channel-selection" style="display: none;">
             <h4>Channel Selection</h4>
-            
+
             <!-- Check All Controls -->
             <div class="check-all-controls">
                 <label>
                     <input type="checkbox" id="checkAllChannels" checked>
                     Check All Channels
                 </label>
+                <label>
+                    <input type="checkbox" id="baselineCheckbox">
+                    Baseline
+                </label>
             </div>
+
 
             <!-- Channel Grid -->
             <div id="channelGrid" class="channel-grid">
@@ -650,7 +668,8 @@
                 scan.</li>
             <li>Connect to your ultrasonic scanner device first, then select trigger mode.</li>
             <li>Green = Scan Complete, Red = Scan Failed/Incomplete, Yellow = In Progress</li>
-            <li><strong>Channel Selection:</strong> Use the checkboxes below the chart to select which channels to display. Channel selection persists when switching between angles and steps.</li>
+            <li><strong>Channel Selection:</strong> Use the checkboxes below the chart to select which channels to
+                display. Channel selection persists when switching between angles and steps.</li>
         </ul>
     </div>
 </body>

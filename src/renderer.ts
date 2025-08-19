@@ -9,11 +9,11 @@ import { saveScanData } from './saveScanData'
 
 // const bonjour = Bonjour.default();
 
-setTimeout(() => {
-  bonjour.find({ type: 'sonic' }, (service) => {
-    console.log('Found:', service);
-  })
-}, 5000);
+// setTimeout(() => {
+//   bonjour.find({ type: 'sonic' }, (service) => {
+//     console.log('Found:', service);
+//   })
+// }, 5000);
 
 // Web Serial API type definitions
 declare global {

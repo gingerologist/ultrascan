@@ -25,13 +25,21 @@ const config: ForgeConfig = {
         config: rendererConfig,
         entryPoints: [
           {
+            name: 'main_window',
             html: './src/index.html',
             js: './src/renderer.ts',
-            name: 'main_window',
             preload: {
               js: './src/preload.ts',
             },
           },
+          {
+            name: 'modal_window',       // the order of the property matters
+            html: './src/modal.html',
+            js: './src/modal.ts',       // there must be one file designated.
+            preload: {
+              js: './src/preload.ts'
+            },
+          }
         ],
       },
     }),

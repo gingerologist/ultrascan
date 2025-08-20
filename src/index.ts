@@ -16,6 +16,9 @@ const bonjour = Bonjour.default({ interface: '0.0.0.0' }) // interface setting i
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
+declare const MODAL_WINDOW_WEBPACK_ENTRY: string;
+declare const MODAL_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
   app.quit();
@@ -23,6 +26,9 @@ if (require('electron-squirrel-startup')) {
 
 let mainWindow: BrowserWindow | null = null;
 let modalWindow: BrowserWindow | null = null;
+
+console.log('MODAL_WINDOW_WEBPACK_ENTRY', MODAL_WINDOW_WEBPACK_ENTRY);
+console.log('MODAL_WINDOW_PRELOAD_WEBPACK_ENTRY', MODAL_WINDOW_PRELOAD_WEBPACK_ENTRY);
 
 function openModalWindow() {
   if (!mainWindow) return;
@@ -34,20 +40,22 @@ function openModalWindow() {
     width: 500,
     height: 400,
     autoHideMenuBar: true,
+    // @ts-ignore - menuBarVisible exists but missing from types
     menuBarVisible: false,  // fake error, said Trump
     minimizable: false,
     maximizable: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: MODAL_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
       nodeIntegration: false
     }
   })
 
-  modalWindow.loadFile('modal.html')
+  modalWindow.loadURL(MODAL_WINDOW_WEBPACK_ENTRY);
 
   modalWindow.once('ready-to-show', () => {
     modalWindow.show();
+    // @ts-ignore - bonjour types incomplete
     const discover = bonjour.find({ type: 'sonic', port: 7332 }, (service) => {
       console.log('bonjour up', service);
     });

@@ -3,11 +3,7 @@ import { BrowserWindow, ipcMain, IpcMainEvent } from 'electron';
 import { SerialPort } from 'serialport';
 import * as Bonjour from 'bonjour';
 
-import type {
-  ConnectionRequest,
-  ConnectionState,
-  RongbukDevice,
-} from './types/devices';
+import type { ConnectionState, RongbukDevice } from './types/devices';
 
 const bonjour = Bonjour.default({ interface: '0.0.0.0' }); // interface setting important!
 
@@ -15,17 +11,6 @@ declare const MODAL_WINDOW_WEBPACK_ENTRY: string;
 declare const MODAL_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 let devicesWindow: BrowserWindow | null = null;
-
-const selectDeviceListener = (event: IpcMainEvent, ...args: any[]) => {
-  // Handle the IPC message
-  console.log('Received args:', args);
-
-  // Close the devices window immediately
-  if (devicesWindow) {
-    devicesWindow.close();
-    devicesWindow = null;
-  }
-};
 
 /**
  * create devices window in insecure mode
@@ -38,7 +23,7 @@ const SelectDevice = (
     parent,
     modal: true,
     show: false,
-    width: 500,
+    width: 600,
     height: 400,
     autoHideMenuBar: true,
     // @ts-ignore - menuBarVisible exists but missing from types
@@ -96,12 +81,22 @@ const SelectDevice = (
       .catch(e => console.log('SerialPort.list()', e));
   });
 
-  devicesWindow.on('closed', () => {
-    devicesWindow = null;
-    ipcMain.off('select-device', selectDeviceListener);
-  });
+  let selected: RongbukDevice | null = null;
+
+  const selectDeviceListener = (event: IpcMainEvent, ...args: any[]) => {
+    console.log('selectDeviceListener args:', args);
+    selected = args[0];
+    devicesWindow.close();
+  };
 
   ipcMain.on('select-device', selectDeviceListener);
+
+  devicesWindow.on('closed', () => {
+    console.log('device window closed');
+    devicesWindow = null;
+    ipcMain.off('select-device', selectDeviceListener);
+    callback(null, selected);
+  });
 };
 
 export type SelectDeviceCallback = (

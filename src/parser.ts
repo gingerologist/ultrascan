@@ -21,18 +21,30 @@ const DATA_PACKET_CHUNK_OFFSET = DATA_PACKET_FORMAT_OFFSET + 4
  * @interface
  */
 export interface ScanConfig {
-  name: string;                    // 32-byte null-terminated string
-  patternSegments: any[];          // 16 segments - structure TBD
-  numPatternSegments: number;      // 0-16
-  repeatCount: number;             // 0-31
-  tailCount: number;               // 0-31
-  txStartDel: number;              // 0-511
-  trSwDelMode: boolean;            // flag
-  captureStartUs: number;          // 0-500 microseconds - capture window start
-  captureEndUs: number;            // 0-500 microseconds - capture window end
-  angles: any[];                   // 16 angles - structure TBD
-  numAngles: number;               // Actual number of angles used
-  totalSteps?: number;             // Total steps across all angles
+  // 32-byte null-terminated string
+  name: string;
+  // 16 segments - structure TBD
+  patternSegments: any[];
+  // 0-16
+  numPatternSegments: number;
+  // 0-31
+  repeatCount: number;
+  // 0-31
+  tailCount: number;
+  // 0-511
+  txStartDel: number;
+  // flag
+  trSwDelMode: boolean;
+  // 0-500 microseconds - capture window start
+  captureStartUs: number;
+  // 0-500 microseconds - capture window end
+  captureEndUs: number;
+  // 16 angles - structure TBD
+  angles: any[];
+  // Actual number of angles used
+  numAngles: number;
+  // Total steps across all angles
+  totalSteps?: number;
   // Note: Samples per packet = 20 × (captureEndUs - captureStartUs) due to 20MHz ADC clock
 
   bfClk: number;
@@ -49,17 +61,22 @@ export interface MetadataPacket {
 export interface DataPacket {
   packetType: 0x02;
   scanId: number;
-  angleIndex: number;    // Changed from 'angle' to match C struct
-  stepIndex: number;     // Changed from 'step' to match C struct  
-  channelIndex: number;  // Changed from 'channel' to match C struct
+  // Changed from 'angle' to match C struct
+  angleIndex: number;
+  // Changed from 'step' to match C struct  
+  stepIndex: number;
+  // Changed from 'channel' to match C struct
+  channelIndex: number;
   sampleFormat: number;
-  samples: number[];     // Unpacked 10-bit ADC samples
+  // Unpacked 10-bit ADC samples
+  samples: number[];
 }
 
 export interface ScanData {
   scanId: number;
   metadata: MetadataPacket;
-  dataPackets: Map<string, DataPacket>; // key: "angleIndex_stepIndex_channelIndex"
+  // key: "angleIndex_stepIndex_channelIndex"
+  dataPackets: Map<string, DataPacket>;
   isComplete: boolean;
   timestamp: number;
 }
@@ -70,7 +87,8 @@ export const stm32h7_crc32 = (data: Uint32Array): number => {
     crc32 = crc32 ^ (data[i] >>> 0);
     for (let j = 0; j < 32; j++) {
       if (crc32 & 0x80000000)
-        crc32 = ((crc32 << 1) >>> 0) ^ 0x04C11DB7; // 0xB71DC104
+        // 0xB71DC104
+        crc32 = ((crc32 << 1) >>> 0) ^ 0x04C11DB7;
       else
         crc32 = ((crc32 << 1) >>> 0);
     }
@@ -84,8 +102,10 @@ export const stm32h7_crc32 = (data: Uint32Array): number => {
 export class UltrasonicDataParser {
   private buffer: Uint8Array = new Uint8Array(0);
   private currentScan: ScanData | null = null;
-  private completedScan: ScanData | null = null; // For auto mode - keep last completed scan
-  private scans: Map<string, ScanData> = new Map(); // key: "bootId_scanId"
+  // For auto mode - keep last completed scan
+  private completedScan: ScanData | null = null;
+  // key: "bootId_scanId"
+  private scans: Map<string, ScanData> = new Map();
   private triggerMode: 'auto' | 'single' = 'auto';
 
   // TODO: remove this
@@ -119,11 +139,12 @@ export class UltrasonicDataParser {
 
   private tryParsePacket(): MetadataPacket | DataPacket | null {
 
-    while (this.buffer.length >= 16) { // Minimum packet size
+    // Minimum packet size
+    while (this.buffer.length >= 16) {
 
       const view = new DataView(this.buffer.buffer, this.buffer.byteOffset);
-
-      const preamble = view.getUint32(0, true); // little endian
+      // little endian
+      const preamble = view.getUint32(0, true);
       if (preamble !== PACKET_PREAMBLE) {
         this.buffer = this.buffer.slice(1);
         continue;
@@ -135,7 +156,8 @@ export class UltrasonicDataParser {
       // Validate packet type
       if (packetType !== 0x01 && packetType !== 0x02 && packetType !== 0x03) {
         this.onParseError?.(`Invalid packet type: 0x${packetType.toString(16)}`, this.buffer.slice(0, Math.min(32, this.buffer.length)));
-        this.buffer = this.buffer.slice(1); // Skip this byte and try again
+        // Skip this byte and try again
+        this.buffer = this.buffer.slice(1);
         continue;
       }
 
@@ -149,7 +171,8 @@ export class UltrasonicDataParser {
       console.log(`packetSize: ${packetSize}, payloadSize: ${payloadSize}`);
 
       if (this.buffer.length < packetSizeWithPreamble) {
-        return null; // Need more data;
+        // Need more data;
+        return null;
       }
 
       // strip off preamble as well as CRC, packetData starts from header (inclusive), ends at crc (exclusive).
@@ -286,8 +309,10 @@ export class UltrasonicDataParser {
     let totalSteps = 0;
 
     for (let i = 0; i < numAngles; i++) {
-      const angleOffset = 8 + (i * 356); // angles[16] starts at offset 8, each angle is 356 bytes
-      const numSteps = view.getUint32(angleOffset, true); // num_steps is first field (uint32_t)
+      // angles[16] starts at offset 8, each angle is 356 bytes
+      const angleOffset = 8 + (i * 356);
+      // num_steps is first field (uint32_t)
+      const numSteps = view.getUint32(angleOffset, true);
 
       // Parse label (32 bytes starting at angleOffset + 4)
       const labelBytes = configData.slice(angleOffset + 4, angleOffset + 36);
@@ -309,7 +334,8 @@ export class UltrasonicDataParser {
 
     return {
       name,
-      patternSegments: [], // Skip parsing pattern_segments for now
+      // Skip parsing pattern_segments for now
+      patternSegments: [],
       numPatternSegments,
       repeatCount,
       tailCount,
@@ -319,7 +345,8 @@ export class UltrasonicDataParser {
       captureEndUs,
       angles,
       numAngles,
-      totalSteps, // Add this for easy access in checkScanComplete
+      // Add this for easy access in checkScanComplete
+      totalSteps,
 
       bfClk,
       adcClk,
@@ -358,9 +385,12 @@ export class UltrasonicDataParser {
     let totalSteps = 0;
 
     for (let i = 0; i < numAngles; i++) {
-      const angleOffset = 8 + (i * 144); // angles[MAX_ANGLES_PER_CONFIG] starts at offset 8, each angle is 144 bytes
-      const numSteps = view.getUint32(angleOffset, true); // num_steps is first field (uint32_t)
-      const delayProfileIndex = view.getUint32(angleOffset + 4, true); // delay_profile_index is second field
+      // angles[MAX_ANGLES_PER_CONFIG] starts at offset 8, each angle is 144 bytes
+      const angleOffset = 8 + (i * 144);
+      // num_steps is first field (uint32_t)
+      const numSteps = view.getUint32(angleOffset, true);
+      // delay_profile_index is second field
+      const delayProfileIndex = view.getUint32(angleOffset + 4, true);
 
       // // Parse label (32 bytes starting at angleOffset + 4)
       // const labelBytes = configData.slice(angleOffset + 4, angleOffset + 36);
@@ -382,7 +412,8 @@ export class UltrasonicDataParser {
 
     return {
       name,
-      patternSegments: [], // Skip parsing pattern_segments for now
+      // Skip parsing pattern_segments for now
+      patternSegments: [],
       numPatternSegments,
       repeatCount,
       tailCount,
@@ -392,7 +423,8 @@ export class UltrasonicDataParser {
       captureEndUs,
       angles,
       numAngles,
-      totalSteps, // Add this for easy access in checkScanComplete
+      // Add this for easy access in checkScanComplete
+      totalSteps,
 
       bfClk,
       adcClk,
@@ -405,7 +437,8 @@ export class UltrasonicDataParser {
 
     // Process in groups of 10 bytes (8 samples each)
     for (let i = 0; i < dataChunk.length; i += 10) {
-      if (i + 9 >= dataChunk.length) break; // Incomplete group
+      // Incomplete group
+      if (i + 9 >= dataChunk.length) break;
 
       // Extract 8 samples from 10 bytes
       const bytes = dataChunk.slice(i, i + 10);
@@ -523,7 +556,8 @@ export class UltrasonicDataParser {
       // Verify we received data for all expected ranges
       // TODO: these code are verbose. need clean.
       const hasAllAngles = maxAngleReceived >= (expectedAngles - 1);
-      const hasAllChannels = maxChannelReceived >= 63; // Channels should be 0-63
+      // Channels should be 0-63
+      const hasAllChannels = maxChannelReceived >= 63;
 
       if (hasAllAngles && hasAllChannels) {
         scan.isComplete = true;
@@ -550,14 +584,15 @@ export class UltrasonicDataParser {
       crc ^= data[i];
       for (let j = 0; j < 8; j++) {
         if (crc & 1) {
-          crc = (crc >>> 1) ^ 0xEDB88320; // Reversed polynomial
+          // Reversed polynomial
+          crc = (crc >>> 1) ^ 0xEDB88320;
         } else {
           crc = crc >>> 1;
         }
       }
     }
-
-    return (~crc) >>> 0; // Convert to unsigned 32-bit
+    // Convert to unsigned 32-bit
+    return (~crc) >>> 0;
   }
 
   // Utility methods
@@ -593,7 +628,8 @@ export class UltrasonicDataParser {
     // Calculate expected total packet length
     const dataChunkSize = this.getExpectedDataChunkSize();
     if (dataChunkSize !== null) {
-      return 14 + dataChunkSize + 4; // header + data + CRC
+      // header + data + CRC
+      return 14 + dataChunkSize + 4;
     }
     return null;
   }

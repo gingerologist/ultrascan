@@ -1,34 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { SelectableDevice, ConnectionRequest } from './types/devices';
+import type { RongbukDevice } from './types/devices';
 
 const { ipcRenderer } = window.require('electron');
 
 const ModalApp: React.FC = () => {
-  const [devices, setDevices] = useState<SelectableDevice[]>([]);
+  const [devices, setDevices] = useState<RongbukDevice[]>([]);
 
   useEffect(() => {
-    const handleDeviceAvailable = (_event: any, device: SelectableDevice) => {
+    const handleDeviceAvailable = (_event: any, device: RongbukDevice) => {
       setDevices(prev => [...prev, device]);
     };
 
-    ipcRenderer.on('device-available', handleDeviceAvailable);
+    ipcRenderer.on('select-device-candidate', handleDeviceAvailable);
 
-    return () => {
-      ipcRenderer.removeListener('device-available', handleDeviceAvailable);
-    };
+    return () =>
+      ipcRenderer.off('select-device-candidate', handleDeviceAvailable);
   }, []);
-
-  const handleConnect = (device: SelectableDevice) => {
-    const request: ConnectionRequest = {
-      deviceId: device.id,
-      type: device.type,
-      serialData: device.serialData,
-      networkData: device.networkData
-    };
-
-    ipcRenderer.send('connect-to-device', request);
-  };
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
@@ -38,10 +26,10 @@ const ModalApp: React.FC = () => {
       ) : (
         <ul>
           {devices.map(device => (
-            <li key={device.id} style={{ marginBottom: '10px' }}>
-              <strong>{device.name}</strong> ({device.description})
+            <li key={device.name} style={{ marginBottom: '10px' }}>
+              <strong>{device.name}</strong> ({device.location})
               <button
-                onClick={() => handleConnect(device)}
+                onClick={() => ipcRenderer.send('select-device', device)}
                 style={{ marginLeft: '10px', padding: '5px 10px' }}
               >
                 Connect

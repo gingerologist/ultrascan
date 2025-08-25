@@ -1,0 +1,4 @@
+{
+  "javascript.format.maxLineLength": 80,
+  "typescript.format.maxLineLength": 80
+}

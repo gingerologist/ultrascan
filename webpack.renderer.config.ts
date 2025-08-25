@@ -24,5 +24,5 @@ export const rendererConfig: Configuration = {
   externals: {
     'fs': 'commonjs fs',
     'path': 'commonjs path'
-  }
+  },
 };

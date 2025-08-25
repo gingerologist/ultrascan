@@ -7,6 +7,7 @@ const SIZEOF_PACKET_HEADER_T = 8
 const SIZEOF_DATA_PACKET_HEADER_T = SIZEOF_PACKET_HEADER_T + 4
 const SIZEOF_PACKET_CRC = 4
 const SIZEOF_META_PACKET_PAYLOAD = 5760 + 12 // size of scan_conf_t TODO: why we need to hardcode this?
+const SIZEOF_META2_PACKET_PAYLOAD = 13888 + 12
 
 const DATA_PACKET_ANGLE_OFFSET = SIZEOF_PACKET_PREAMBLE + SIZEOF_PACKET_HEADER_T
 const DATA_PACKET_STEP_OFFSET = DATA_PACKET_ANGLE_OFFSET + 1
@@ -132,7 +133,7 @@ export class UltrasonicDataParser {
       const packetType = typeAndScanId & 0xff;
 
       // Validate packet type
-      if (packetType !== 0x01 && packetType !== 0x02) {
+      if (packetType !== 0x01 && packetType !== 0x02 && packetType !== 0x03) {
         this.onParseError?.(`Invalid packet type: 0x${packetType.toString(16)}`, this.buffer.slice(0, Math.min(32, this.buffer.length)));
         this.buffer = this.buffer.slice(1); // Skip this byte and try again
         continue;
@@ -145,7 +146,7 @@ export class UltrasonicDataParser {
       const packetSize = SIZEOF_PACKET_HEADER_T + payloadSize + SIZEOF_PACKET_CRC;
       const packetSizeWithPreamble = SIZEOF_PACKET_PREAMBLE + packetSize;
 
-      // console.log(`packetSize: ${packetSize}, payloadSize: ${payloadSize}`);
+      console.log(`packetSize: ${packetSize}, payloadSize: ${payloadSize}`);
 
       if (this.buffer.length < packetSizeWithPreamble) {
         return null; // Need more data;
@@ -228,6 +229,20 @@ export class UltrasonicDataParser {
           sampleFormat,
           samples,
         };
+      } else if (packetType == 0x03) {
+        const configData = packetData.slice(SIZEOF_PACKET_HEADER_T, SIZEOF_PACKET_HEADER_T + SIZEOF_META2_PACKET_PAYLOAD);
+        const scanConfig = this.parseScan2Config(configData);
+
+        if (scanId === 0) {
+          console.log('testing (scan id = 0) metadata packet received', scanConfig);
+          return null;
+        }
+
+        return {
+          packetType: 0x01,
+          scanId,
+          scanConfig
+        }
       }
     }
 
@@ -286,6 +301,79 @@ export class UltrasonicDataParser {
 
       totalSteps += numSteps;
       console.log(`📊 Angle ${i}: ${numSteps} steps, label: "${label}"`);
+    }
+
+    console.log(`Total steps across ${numAngles} angles: ${totalSteps}`);
+    console.log(`Baseline mode is ${baseline ? 'on' : 'off'}`);
+    console.log(`Expected packets: ${totalSteps} steps × ${(baseline ? 65 : 64)} channels = ${totalSteps * (baseline ? 65 : 64)}`);
+
+    return {
+      name,
+      patternSegments: [], // Skip parsing pattern_segments for now
+      numPatternSegments,
+      repeatCount,
+      tailCount,
+      txStartDel,
+      trSwDelMode,
+      captureStartUs,
+      captureEndUs,
+      angles,
+      numAngles,
+      totalSteps, // Add this for easy access in checkScanComplete
+
+      bfClk,
+      adcClk,
+      baseline
+    };
+  }
+
+  private parseScan2Config(configData: Uint8Array): ScanConfig {
+    if (configData.length < SIZEOF_META2_PACKET_PAYLOAD) {
+      throw new Error(`Scan config too short: ${configData.length} bytes, expected ${SIZEOF_META2_PACKET_PAYLOAD}`);
+    }
+
+    const view = new DataView(configData.buffer, configData.byteOffset);
+
+    // Read basic fields
+    const captureStartUs = view.getUint16(0, true);
+    const captureEndUs = view.getUint16(2, true);
+    const numAngles = view.getUint16(4, true);
+    const numPatternSegments = view.getUint16(6, true);
+
+    // Parse name from offset 13824 + 8
+    const nameBytes = configData.slice(13824 + 8, 13824 + 8 + 32);
+    const nullIndex = nameBytes.indexOf(0);
+    const name = new TextDecoder().decode(nameBytes.slice(0, nullIndex >= 0 ? nullIndex : 32));
+
+    const trSwDelMode = view.getUint16(13824 + 8 + 48, true) !== 0;
+    const repeatCount = view.getUint16(13824 + 8 + 48 + 2, true);
+    const tailCount = view.getUint16(13824 + 8 + 48 + 4, true);
+    const txStartDel = view.getUint16(13824 + 8 + 48 + 6, true);
+    const bfClk = view.getUint32(13824 + 8 + 48 + 8, true);
+    const adcClk = view.getUint32(13824 + 8 + 48 + 12, true);
+    const baseline = ((view.getUint32(13824 + 8 + 48 + 16, true) >>> 0) & 1) === 1;
+
+    // Parse angles array to get num_steps for each angle
+    const angles: any[] = [];
+    let totalSteps = 0;
+
+    for (let i = 0; i < numAngles; i++) {
+      const angleOffset = 8 + (i * 144); // angles[MAX_ANGLES_PER_CONFIG] starts at offset 8, each angle is 144 bytes
+      const numSteps = view.getUint32(angleOffset, true); // num_steps is first field (uint32_t)
+      const delayProfileIndex = view.getUint32(angleOffset + 4, true); // delay_profile_index is second field
+
+      // // Parse label (32 bytes starting at angleOffset + 4)
+      // const labelBytes = configData.slice(angleOffset + 4, angleOffset + 36);
+      // const labelNullIndex = labelBytes.indexOf(0);
+      // const label = new TextDecoder().decode(labelBytes.slice(0, labelNullIndex >= 0 ? labelNullIndex : 32));
+
+      angles.push({
+        numSteps,
+        delayProfileIndex
+      });
+
+      totalSteps += numSteps;
+      // console.log(`📊 Angle ${i}: ${numSteps} steps, label: "${label}"`);
     }
 
     console.log(`Total steps across ${numAngles} angles: ${totalSteps}`);

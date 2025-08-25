@@ -1,13 +1,13 @@
 export { }; // Make this file a module
 
-// import * as Bonjour from 'bonjour';
+
 
 import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
 import * as echarts from 'echarts';
 
 import { saveScanData } from './saveScanData'
 
-// const bonjour = Bonjour.default();
+
 
 // setTimeout(() => {
 //   bonjour.find({ type: 'sonic' }, (service) => {
@@ -248,10 +248,10 @@ class UltrasonicScannerInterface {
     console.log('📋 Channel selection grid initialized with 64 channels + baseline');
   }
 
-    // 7. New method to handle baseline checkbox changes
+  // 7. New method to handle baseline checkbox changes
   private handleBaselineCheckboxChange(isChecked: boolean): void {
     console.log(`📋 Baseline ${isChecked ? 'enabled' : 'disabled'}`);
-    
+
     this.showBaseline = isChecked;
     this.updateSelectionSummary();
 
@@ -294,7 +294,7 @@ class UltrasonicScannerInterface {
     }
   }
 
- // 8. Update handleCheckAllChange to only affect regular channels (0-63)
+  // 8. Update handleCheckAllChange to only affect regular channels (0-63)
   private handleCheckAllChange(isChecked: boolean): void {
     console.log(`📋 Check all regular channels: ${isChecked}`);
 
@@ -765,7 +765,7 @@ class UltrasonicScannerInterface {
 
     // Process baseline configuration
     const hasBaseline = scan.metadata.scanConfig.baseline === true;
-    this.updateBaselineAvailability(hasBaseline);    
+    this.updateBaselineAvailability(hasBaseline);
 
     try {
       saveScanData(scan);
@@ -789,10 +789,10 @@ class UltrasonicScannerInterface {
   // 11. New method to update baseline availability
   private updateBaselineAvailability(hasBaseline: boolean): void {
     this.baselineEnabled = hasBaseline;
-    
+
     if (this.baselineCheckbox) {
       this.baselineCheckbox.disabled = !hasBaseline;
-      
+
       // Update label styling
       const label = this.baselineCheckbox.parentElement as HTMLLabelElement;
       if (label) {
@@ -808,7 +808,7 @@ class UltrasonicScannerInterface {
 
     console.log(`📋 Baseline availability updated: ${hasBaseline ? 'enabled' : 'disabled'}`);
     this.updateSelectionSummary();
-  }  
+  }
 
   private displayScanConfiguration(config: any): void {
     if (!this.scanConfigDisplay || !this.scanConfigText) return;

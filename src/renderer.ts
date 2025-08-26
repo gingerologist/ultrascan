@@ -55,7 +55,6 @@ class UltrasonicScannerInterface {
   private portSelect: HTMLSelectElement;
   private connectButton: HTMLButtonElement;
   private disconnectButton: HTMLButtonElement;
-  private connectionStatus: HTMLElement;
 
   // Single mode controls
   private runStopButton: HTMLButtonElement;
@@ -138,9 +137,6 @@ class UltrasonicScannerInterface {
     this.disconnectButton = document.getElementById(
       'disconnectButton'
     ) as HTMLButtonElement;
-    this.connectionStatus = document.getElementById(
-      'connectionStatus'
-    ) as HTMLElement;
     this.runStopButton = document.getElementById(
       'runStopButton'
     ) as HTMLButtonElement;
@@ -199,7 +195,6 @@ class UltrasonicScannerInterface {
     if (!this.portSelect) missingElements.push('portSelect');
     if (!this.connectButton) missingElements.push('connectButton');
     if (!this.disconnectButton) missingElements.push('disconnectButton');
-    if (!this.connectionStatus) missingElements.push('connectionStatus');
     if (!this.runStopButton) missingElements.push('runStopButton');
     if (!this.chartContainer) missingElements.push('chartContainer');
     if (!this.channelSelectionContainer)
@@ -414,14 +409,12 @@ class UltrasonicScannerInterface {
           16
         )}`
       );
-      this.setConnectionStatus('Device rebooted', 'connected');
-    };
+      };
 
 
     this.dataParser.onParseError = (error: string, data: Uint8Array) => {
       console.error('Parse error:', error);
-      this.setConnectionStatus(`Parse error: ${error}`, 'error');
-    };
+      };
   }
 
   private initializeEventListeners(): void {
@@ -489,8 +482,7 @@ class UltrasonicScannerInterface {
 
   private async scanPorts(): Promise<void> {
     if (!('serial' in navigator)) {
-      this.setConnectionStatus('Web Serial API not supported', 'error');
-      return;
+        return;
     }
 
     try {
@@ -514,8 +506,7 @@ class UltrasonicScannerInterface {
       }
     } catch (error) {
       console.error('Error scanning ports:', error);
-      this.setConnectionStatus('Error scanning ports', 'error');
-    }
+      }
   }
 
   private hasPortListChanged(newPorts: SerialPort[]): boolean {
@@ -607,13 +598,11 @@ class UltrasonicScannerInterface {
 
   private async connectToSelectedPort(): Promise<void> {
     if (!this.selectedPort) {
-      this.setConnectionStatus('No port selected', 'error');
-      return;
+        return;
     }
 
     this.connectionState = 'connecting';
     this.updateUI();
-    this.setConnectionStatus('Connecting...', 'connecting');
 
     try {
       await this.selectedPort.open({
@@ -626,20 +615,12 @@ class UltrasonicScannerInterface {
       this.connectedPort = this.selectedPort;
       this.connectionState = 'connected';
 
-      this.setConnectionStatus(
-        `Connected to ${this.getPortDisplayName(this.connectedPort)}`,
-        'connected'
-      );
-
       this.startDataReading();
       this.updateUI();
     } catch (error) {
       console.error('Connection error:', error);
       this.connectionState = 'error';
-      this.setConnectionStatus(
-        `Connection failed: ${(error as Error).message}`,
-        'error'
-      );
+
 
       setTimeout(() => {
         if (this.connectionState === 'error') {
@@ -677,10 +658,7 @@ class UltrasonicScannerInterface {
     } catch (error) {
       if ((error as Error).name !== 'NetworkError') {
         console.error('Data reading error:', error);
-        this.setConnectionStatus(
-          `Data reading error: ${(error as Error).message}`,
-          'error'
-        );
+
       }
     } finally {
       if (this.reader) {
@@ -729,7 +707,6 @@ class UltrasonicScannerInterface {
     }
 
     this.dataParser.reset();
-    this.setConnectionStatus('Disconnected', 'disconnected');
     this.updateUI();
     this.updateScanDisplay();
   }
@@ -741,14 +718,12 @@ class UltrasonicScannerInterface {
     this.waitingForScan = false;
     this.displayScanData = null;
 
-    this.setConnectionStatus('Device was unplugged', 'error');
     this.updateUI();
     this.updateScanDisplay();
 
     setTimeout(() => {
       if (this.connectionState === 'disconnected') {
-        this.setConnectionStatus('No connection', 'disconnected');
-      }
+          }
     }, 3000);
   }
 
@@ -1419,12 +1394,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     }
   }
 
-  private setConnectionStatus(message: string, type: ConnectionState): void {
-    if (this.connectionStatus) {
-      this.connectionStatus.textContent = message;
-      this.connectionStatus.className = `status ${type}`;
-    }
-  }
 
   private debugElementStatus(): void {
     console.log('🔍 Element Debug Status:');
@@ -1508,10 +1477,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if ('serial' in navigator) {
     new UltrasonicScannerInterface();
   } else {
-    const status = document.getElementById('connectionStatus');
-    if (status) {
-      status.textContent = 'Web Serial API is not supported in this browser';
-      status.className = 'status error';
-    }
   }
 });

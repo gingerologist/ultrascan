@@ -428,7 +428,6 @@ class UltrasonicScannerInterface {
 
   private initializeParser(): void {
     this.dataParser = new UltrasonicDataParser();
-    this.dataParser.setTriggerMode('single');
 
     this.dataParser.onMetadataReceived = (metadata: MetadataPacket) => {
       this.handleMetadataReceived(metadata);
@@ -450,6 +449,7 @@ class UltrasonicScannerInterface {
       );
       this.setConnectionStatus('Device rebooted', 'connected');
     };
+
 
     this.dataParser.onParseError = (error: string, data: Uint8Array) => {
       console.error('Parse error:', error);
@@ -1464,8 +1464,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       this.scanCounter.textContent = `Scans Received: ${this.scanCount}`;
     }
 
-    const scanToDisplay =
-      this.displayScanData || this.dataParser.getDisplayScan();
+    const scanToDisplay = this.displayScanData || this.dataParser.getDisplayScan();
 
     if (scanToDisplay) {
       const scan = scanToDisplay;

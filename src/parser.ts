@@ -102,11 +102,8 @@ export const stm32h7_crc32 = (data: Uint32Array): number => {
 export class UltrasonicDataParser {
   private buffer: Uint8Array = new Uint8Array(0);
   private currentScan: ScanData | null = null;
-  // For auto mode - keep last completed scan
-  private completedScan: ScanData | null = null;
   // key: "bootId_scanId"
-  private scans: Map<string, ScanData> = new Map();
-  private triggerMode: 'auto' | 'single' = 'auto';
+    private scans: Map<string, ScanData> = new Map();
 
   // TODO: remove this
   // Sync pattern for packet alignment (fixed boot ID in little-endian)
@@ -613,11 +610,6 @@ export class UltrasonicDataParser {
       //   this.onDeviceReboot?.(packet.bootId, this.currentScan.bootId);
       // }
 
-      // In single mode, clear previous scan when starting new one
-      if (this.triggerMode === 'single') {
-        this.completedScan = null;
-      }
-
       this.currentScan = {
         scanId: packet.scanId,
         metadata,
@@ -715,10 +707,6 @@ export class UltrasonicDataParser {
       if (hasAllAngles && hasAllChannels) {
         scan.isComplete = true;
 
-        if (this.triggerMode === 'auto') {
-          this.completedScan = scan;
-        }
-
         console.log(
           `✅ Scan marked complete: ${scan.dataPackets.size}/${totalExpectedPackets} packets`
         );
@@ -755,16 +743,6 @@ export class UltrasonicDataParser {
     return ~crc >>> 0;
   }
 
-  // Utility methods
-  public setTriggerMode(mode: 'auto' | 'single'): void {
-    this.triggerMode = mode;
-
-    // When switching to single mode, clear completed scan buffer
-    if (mode === 'single') {
-      this.completedScan = null;
-    }
-  }
-
   public getExpectedSamplesPerPacket(): number | null {
     // Calculate expected samples based on current scan configuration
     if (this.currentScan && this.currentScan.metadata) {
@@ -798,19 +776,8 @@ export class UltrasonicDataParser {
     return this.currentScan;
   }
 
-  public getCompletedScan(): ScanData | null {
-    return this.completedScan;
-  }
-
   public getDisplayScan(): ScanData | null {
-    // Return the appropriate scan for display based on mode
-    if (this.triggerMode === 'auto') {
-      // In auto mode, prefer completed scan, fallback to current if receiving
-      return this.completedScan || this.currentScan;
-    } else {
-      // In single mode, show current scan (which becomes completed when done)
       return this.currentScan;
-    }
   }
 
   public getScan(bootId: number, scanId: number): ScanData | null {
@@ -834,7 +801,6 @@ export class UltrasonicDataParser {
   public reset(): void {
     // Clear all scan data - useful when switching modes or reconnecting
     this.currentScan = null;
-    this.completedScan = null;
     this.scans.clear();
     this.buffer = new Uint8Array(0);
   }

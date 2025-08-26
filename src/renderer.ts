@@ -715,17 +715,17 @@ class UltrasonicScannerInterface {
 
     // Hide chart controls and channel selection
     if (this.chartControlsContainer) {
-      this.chartControlsContainer.style.display = 'none';
+      
     }
     if (this.chartContainer) {
-      this.chartContainer.style.display = 'none';
+      
     }
     if (this.channelSelectionContainer) {
       // NEW
-      this.channelSelectionContainer.style.display = 'none';
+      
     }
     if (this.scanConfigDisplay) {
-      this.scanConfigDisplay.style.display = 'none';
+      
     }
 
     this.dataParser.reset();
@@ -837,7 +837,7 @@ Capture Window: ${config.captureStartUs}μs - ${config.captureEndUs}μs
 Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     this.scanConfigText.textContent = configText;
-    this.scanConfigDisplay.style.display = 'block';
+    
   }
 
   private populateSelectors(config: any): void {
@@ -905,16 +905,16 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     console.log('📊 Showing chart controls and channel selection');
 
     if (this.chartControlsContainer) {
-      this.chartControlsContainer.style.display = 'flex';
+      
     }
 
     if (this.chartContainer) {
       // Force explicit dimensions BEFORE showing
-      this.chartContainer.style.display = 'block';
+      
       this.chartContainer.style.width = '100%';
       this.chartContainer.style.height = '400px';
       this.chartContainer.style.minHeight = '400px';
-      this.chartContainer.classList.add('chart-visible');
+      
 
       // Force layout recalculation
       this.chartContainer.offsetHeight;
@@ -929,7 +929,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     // NEW: Show channel selection
     if (this.channelSelectionContainer) {
-      this.channelSelectionContainer.style.display = 'block';
+      
     }
 
     // Small delay to ensure layout is computed
@@ -1311,7 +1311,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
   private cleanupChart(): void {
     if (this.chart) {
-      this.chartContainer.classList.remove('chart-visible');
+      
       try {
         // Call custom cleanup if it exists
         if ((this.chart as any)._cleanupResize) {

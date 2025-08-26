@@ -540,23 +540,20 @@
 
     <div class="control-section">
         <!-- Serial Port Controls -->
-        <div class="control-row">
-            <div class="control-group">
-                <label>Serial Port:</label>
-                <select id="portSelect">
-                    <option value="">Scanning for ports...</option>
-                </select>
+        <div class="control-row" style="justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="control-group">
+                    <label>Serial Port:</label>
+                    <select id="portSelect">
+                        <option value="">Scanning for ports...</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <button id="connectButton" disabled>Connect</button>
+                    <button id="disconnectButton" disabled>Disconnect</button>
+                </div>
             </div>
-            <button id="connectButton" disabled>Connect</button>
-            <button id="disconnectButton" disabled>Disconnect</button>
-        </div>
-
-        <!-- Single Mode Controls -->
-        <div class="control-row">
-            <div class="control-group">
-                <label>Mode: Single Trigger</label>
-                <button id="runStopButton" class="run-stop-btn stopped" disabled>RUN</button>
-            </div>
+            <button id="runStopButton" class="run-stop-btn stopped" disabled>RUN</button>
         </div>
     </div>
 

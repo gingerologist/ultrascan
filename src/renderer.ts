@@ -68,7 +68,7 @@ class UltrasonicScannerInterface {
   private expectedPacketsEl: HTMLElement;
   private progressFill: HTMLElement;
   private scanResult: HTMLElement;
-  private scanCounter: HTMLElement;
+  
 
   // Chart elements
   private angleSelect: HTMLSelectElement;
@@ -96,7 +96,7 @@ class UltrasonicScannerInterface {
   // Parser and data
   private dataParser: UltrasonicDataParser;
   private isRunning: boolean = false;
-  private scanCount: number = 0;
+  
   private displayScanData: ScanData | null = null;
   private waitingForScan: boolean = false;
 
@@ -153,7 +153,7 @@ class UltrasonicScannerInterface {
     ) as HTMLElement;
     this.progressFill = document.getElementById('progressFill') as HTMLElement;
     this.scanResult = document.getElementById('scanResult') as HTMLElement;
-    this.scanCounter = document.getElementById('scanCounter') as HTMLElement;
+
 
     this.angleSelect = document.getElementById(
       'angleSelect'
@@ -783,7 +783,7 @@ class UltrasonicScannerInterface {
       console.error('Failed to save scan data: ', error);
     }
 
-    this.scanCount++;
+
     this.displayScanData = scan;
 
     this.isRunning = false;
@@ -1331,9 +1331,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     status?: 'good' | 'bad' | 'waiting',
     message?: string
   ): void {
-    if (this.scanCounter) {
-      this.scanCounter.textContent = `Scans Received: ${this.scanCount}`;
-    }
+
 
     const scanToDisplay = this.displayScanData || this.dataParser.getDisplayScan();
 

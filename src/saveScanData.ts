@@ -183,7 +183,7 @@ function generateStepCSV(stepData: Map<number, number[]> | undefined): string {
 /*
 private handleScanComplete(scan: ScanData): void {
   console.log('Scan complete:', scan);
-  this.scanCount++;
+
   this.displayScanData = scan;
 
   // Save scan data to disk

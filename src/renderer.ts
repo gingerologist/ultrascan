@@ -63,7 +63,6 @@ class UltrasonicScannerInterface {
   private numAnglesEl: HTMLElement;
   private dataPacketCountEl: HTMLElement;
   private expectedPacketsEl: HTMLElement;
-  private scanResult: HTMLElement;
 
   // Chart elements
   private angleSelect: HTMLSelectElement;
@@ -1293,10 +1292,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       if (this.expectedPacketsEl) this.expectedPacketsEl.textContent = '-';
     }
 
-    if (status && message && this.scanResult) {
-      this.scanResult.className = `scan-result ${status}`;
-      this.scanResult.textContent = message;
-    }
+
   }
 }
 

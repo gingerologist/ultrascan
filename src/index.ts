@@ -5,6 +5,7 @@ import {
   MenuItem,
   ipcMain,
   IpcMainEvent,
+  dialog,
 } from 'electron';
 
 import * as net from 'net';
@@ -160,7 +161,10 @@ const handleSelectDevice: SelectDeviceCallback = (error, device) => {
       if (currentDevice.connectionState === 'CONNECTED') {
         client.destroy(); // close will follow soon.
       } else {
-        // TODO: create a dialog.
+        dialog.showErrorBox(
+          'Error',
+          `Failed to establish a connection to ${device.name} at ${device.location}`
+        );
       }
     });
   }

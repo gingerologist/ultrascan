@@ -1,19 +1,14 @@
-export { }; // Make this file a module
+export {}; // Make this file a module
 
-
-
-import { UltrasonicDataParser, MetadataPacket, DataPacket, ScanData } from './parser';
+import {
+  UltrasonicDataParser,
+  MetadataPacket,
+  DataPacket,
+  ScanData,
+} from './parser';
 import * as echarts from 'echarts';
 
-import { saveScanData } from './saveScanData'
-
-
-
-// setTimeout(() => {
-//   bonjour.find({ type: 'sonic' }, (service) => {
-//     console.log('Found:', service);
-//   })
-// }, 5000);
+import { saveScanData } from './saveScanData';
 
 // Web Serial API type definitions
 declare global {
@@ -138,36 +133,72 @@ class UltrasonicScannerInterface {
 
   private initializeElements(): void {
     // Get all DOM elements
-    this.portSelect = document.getElementById('portSelect') as HTMLSelectElement;
-    this.connectButton = document.getElementById('connectButton') as HTMLButtonElement;
-    this.disconnectButton = document.getElementById('disconnectButton') as HTMLButtonElement;
-    this.connectionStatus = document.getElementById('connectionStatus') as HTMLElement;
-    this.runStopButton = document.getElementById('runStopButton') as HTMLButtonElement;
+    this.portSelect = document.getElementById(
+      'portSelect'
+    ) as HTMLSelectElement;
+    this.connectButton = document.getElementById(
+      'connectButton'
+    ) as HTMLButtonElement;
+    this.disconnectButton = document.getElementById(
+      'disconnectButton'
+    ) as HTMLButtonElement;
+    this.connectionStatus = document.getElementById(
+      'connectionStatus'
+    ) as HTMLElement;
+    this.runStopButton = document.getElementById(
+      'runStopButton'
+    ) as HTMLButtonElement;
 
     this.bootIdEl = document.getElementById('bootId') as HTMLElement;
     this.scanIdEl = document.getElementById('scanId') as HTMLElement;
     this.scanNameEl = document.getElementById('scanName') as HTMLElement;
     this.numAnglesEl = document.getElementById('numAngles') as HTMLElement;
-    this.dataPacketCountEl = document.getElementById('dataPacketCount') as HTMLElement;
-    this.expectedPacketsEl = document.getElementById('expectedPackets') as HTMLElement;
+    this.dataPacketCountEl = document.getElementById(
+      'dataPacketCount'
+    ) as HTMLElement;
+    this.expectedPacketsEl = document.getElementById(
+      'expectedPackets'
+    ) as HTMLElement;
     this.progressFill = document.getElementById('progressFill') as HTMLElement;
     this.scanResult = document.getElementById('scanResult') as HTMLElement;
     this.scanCounter = document.getElementById('scanCounter') as HTMLElement;
 
-    this.angleSelect = document.getElementById('angleSelect') as HTMLSelectElement;
-    this.stepSelect = document.getElementById('stepSelect') as HTMLSelectElement;
-    this.updateChartButton = document.getElementById('updateChartButton') as HTMLButtonElement;
-    this.chartContainer = document.getElementById('chartContainer') as HTMLElement;
-    this.chartControlsContainer = document.getElementById('chartControlsContainer') as HTMLElement;
-    this.scanConfigDisplay = document.getElementById('scanConfigDisplay') as HTMLElement;
-    this.scanConfigText = document.getElementById('scanConfigText') as HTMLElement;
+    this.angleSelect = document.getElementById(
+      'angleSelect'
+    ) as HTMLSelectElement;
+    this.stepSelect = document.getElementById(
+      'stepSelect'
+    ) as HTMLSelectElement;
+    this.updateChartButton = document.getElementById(
+      'updateChartButton'
+    ) as HTMLButtonElement;
+    this.chartContainer = document.getElementById(
+      'chartContainer'
+    ) as HTMLElement;
+    this.chartControlsContainer = document.getElementById(
+      'chartControlsContainer'
+    ) as HTMLElement;
+    this.scanConfigDisplay = document.getElementById(
+      'scanConfigDisplay'
+    ) as HTMLElement;
+    this.scanConfigText = document.getElementById(
+      'scanConfigText'
+    ) as HTMLElement;
 
     // NEW: Channel selection elements
-    this.channelSelectionContainer = document.getElementById('channelSelectionContainer') as HTMLElement;
-    this.checkAllChannels = document.getElementById('checkAllChannels') as HTMLInputElement;
-    this.baselineCheckbox = document.getElementById('baselineCheckbox') as HTMLInputElement;
+    this.channelSelectionContainer = document.getElementById(
+      'channelSelectionContainer'
+    ) as HTMLElement;
+    this.checkAllChannels = document.getElementById(
+      'checkAllChannels'
+    ) as HTMLInputElement;
+    this.baselineCheckbox = document.getElementById(
+      'baselineCheckbox'
+    ) as HTMLInputElement;
     this.channelGrid = document.getElementById('channelGrid') as HTMLElement;
-    this.selectionSummary = document.getElementById('selectionSummary') as HTMLElement;
+    this.selectionSummary = document.getElementById(
+      'selectionSummary'
+    ) as HTMLElement;
 
     // Check core elements
     const missingElements: string[] = [];
@@ -178,7 +209,8 @@ class UltrasonicScannerInterface {
     if (!this.connectionStatus) missingElements.push('connectionStatus');
     if (!this.runStopButton) missingElements.push('runStopButton');
     if (!this.chartContainer) missingElements.push('chartContainer');
-    if (!this.channelSelectionContainer) missingElements.push('channelSelectionContainer');
+    if (!this.channelSelectionContainer)
+      missingElements.push('channelSelectionContainer');
     if (!this.baselineCheckbox) missingElements.push('baselineCheckbox');
 
     if (missingElements.length > 0) {
@@ -189,7 +221,9 @@ class UltrasonicScannerInterface {
   // 6. Helper method to create channel checkbox
   private createChannelCheckbox(channel: number, isChecked: boolean): void {
     const channelItem = document.createElement('div');
-    channelItem.className = isChecked ? 'channel-item selected' : 'channel-item';
+    channelItem.className = isChecked
+      ? 'channel-item selected'
+      : 'channel-item';
 
     const label = document.createElement('label');
     label.textContent = `CH${channel}`;
@@ -201,9 +235,12 @@ class UltrasonicScannerInterface {
     checkbox.checked = isChecked;
     checkbox.dataset.channel = channel.toString();
 
-    checkbox.addEventListener('change', (e) => {
+    checkbox.addEventListener('change', e => {
       const target = e.target as HTMLInputElement;
-      this.handleChannelCheckboxChange(parseInt(target.dataset.channel!), target.checked);
+      this.handleChannelCheckboxChange(
+        parseInt(target.dataset.channel!),
+        target.checked
+      );
     });
 
     channelItem.appendChild(label);
@@ -230,7 +267,7 @@ class UltrasonicScannerInterface {
 
     // Add baseline checkbox event listener
     if (this.baselineCheckbox) {
-      this.baselineCheckbox.addEventListener('change', (e) => {
+      this.baselineCheckbox.addEventListener('change', e => {
         const target = e.target as HTMLInputElement;
         this.handleBaselineCheckboxChange(target.checked);
       });
@@ -238,14 +275,16 @@ class UltrasonicScannerInterface {
 
     // Initialize check-all checkbox event listener (existing code)
     if (this.checkAllChannels) {
-      this.checkAllChannels.addEventListener('change', (e) => {
+      this.checkAllChannels.addEventListener('change', e => {
         const target = e.target as HTMLInputElement;
         this.handleCheckAllChange(target.checked);
       });
     }
 
     this.updateSelectionSummary();
-    console.log('📋 Channel selection grid initialized with 64 channels + baseline');
+    console.log(
+      '📋 Channel selection grid initialized with 64 channels + baseline'
+    );
   }
 
   // 7. New method to handle baseline checkbox changes
@@ -262,8 +301,13 @@ class UltrasonicScannerInterface {
   }
 
   // NEW: Handle individual channel checkbox changes
-  private handleChannelCheckboxChange(channel: number, isChecked: boolean): void {
-    console.log(`📋 Channel ${channel} ${isChecked ? 'selected' : 'deselected'}`);
+  private handleChannelCheckboxChange(
+    channel: number,
+    isChecked: boolean
+  ): void {
+    console.log(
+      `📋 Channel ${channel} ${isChecked ? 'selected' : 'deselected'}`
+    );
 
     // Update selected channels set
     if (isChecked) {
@@ -273,7 +317,9 @@ class UltrasonicScannerInterface {
     }
 
     // Update visual state
-    const channelItem = document.querySelector(`#channel_${channel}`)?.parentElement;
+    const channelItem = document.querySelector(
+      `#channel_${channel}`
+    )?.parentElement;
     if (channelItem) {
       if (isChecked) {
         channelItem.classList.add('selected');
@@ -300,7 +346,9 @@ class UltrasonicScannerInterface {
 
     // Update all regular channel checkboxes (0-63 only)
     for (let channel = 0; channel < 64; channel++) {
-      const checkbox = document.getElementById(`channel_${channel}`) as HTMLInputElement;
+      const checkbox = document.getElementById(
+        `channel_${channel}`
+      ) as HTMLInputElement;
       const channelItem = checkbox?.parentElement;
 
       if (checkbox && checkbox.checked !== isChecked) {
@@ -351,8 +399,10 @@ class UltrasonicScannerInterface {
     if (!this.selectionSummary) return;
 
     const selectedCount = this.selectedChannels.size;
-    const baselineText = this.showBaseline && this.baselineEnabled ? ' + Baseline' : '';
-    const totalSelected = selectedCount + (this.showBaseline && this.baselineEnabled ? 1 : 0);
+    const baselineText =
+      this.showBaseline && this.baselineEnabled ? ' + Baseline' : '';
+    const totalSelected =
+      selectedCount + (this.showBaseline && this.baselineEnabled ? 1 : 0);
     const maxChannels = 64 + (this.baselineEnabled ? 1 : 0);
 
     const countSpan = this.selectionSummary.querySelector('.count');
@@ -393,7 +443,11 @@ class UltrasonicScannerInterface {
     };
 
     this.dataParser.onDeviceReboot = (newBootId: number, oldBootId: number) => {
-      console.log(`Device rebooted: 0x${oldBootId.toString(16)} -> 0x${newBootId.toString(16)}`);
+      console.log(
+        `Device rebooted: 0x${oldBootId.toString(16)} -> 0x${newBootId.toString(
+          16
+        )}`
+      );
       this.setConnectionStatus('Device rebooted', 'connected');
     };
 
@@ -408,7 +462,9 @@ class UltrasonicScannerInterface {
     if (this.portSelect) {
       this.portSelect.addEventListener('change', () => {
         const selectedIndex = parseInt(this.portSelect.value);
-        this.selectedPort = isNaN(selectedIndex) ? null : this.availablePorts[selectedIndex];
+        this.selectedPort = isNaN(selectedIndex)
+          ? null
+          : this.availablePorts[selectedIndex];
         this.updateUI();
       });
     }
@@ -478,8 +534,10 @@ class UltrasonicScannerInterface {
         this.updatePortDropdown();
 
         if (this.connectedPort && this.connectionState === 'connected') {
-          const stillExists = ports.some(port =>
-            JSON.stringify(port.getInfo()) === JSON.stringify(this.connectedPort!.getInfo())
+          const stillExists = ports.some(
+            port =>
+              JSON.stringify(port.getInfo()) ===
+              JSON.stringify(this.connectedPort!.getInfo())
           );
 
           if (!stillExists) {
@@ -534,10 +592,15 @@ class UltrasonicScannerInterface {
         this.portSelect.appendChild(option);
       });
 
-      if (currentSelection && this.portSelect.querySelector(`option[value="${currentSelection}"]`)) {
+      if (
+        currentSelection &&
+        this.portSelect.querySelector(`option[value="${currentSelection}"]`)
+      ) {
         this.portSelect.value = currentSelection;
         const selectedIndex = parseInt(currentSelection);
-        this.selectedPort = isNaN(selectedIndex) ? null : this.availablePorts[selectedIndex];
+        this.selectedPort = isNaN(selectedIndex)
+          ? null
+          : this.availablePorts[selectedIndex];
       } else {
         this.selectedPort = null;
       }
@@ -590,21 +653,26 @@ class UltrasonicScannerInterface {
         baudRate: 115200,
         dataBits: 8,
         parity: 'none',
-        stopBits: 1
+        stopBits: 1,
       });
 
       this.connectedPort = this.selectedPort;
       this.connectionState = 'connected';
 
-      this.setConnectionStatus(`Connected to ${this.getPortDisplayName(this.connectedPort)}`, 'connected');
+      this.setConnectionStatus(
+        `Connected to ${this.getPortDisplayName(this.connectedPort)}`,
+        'connected'
+      );
 
       this.startDataReading();
       this.updateUI();
-
     } catch (error) {
       console.error('Connection error:', error);
       this.connectionState = 'error';
-      this.setConnectionStatus(`Connection failed: ${(error as Error).message}`, 'error');
+      this.setConnectionStatus(
+        `Connection failed: ${(error as Error).message}`,
+        'error'
+      );
 
       setTimeout(() => {
         if (this.connectionState === 'error') {
@@ -642,7 +710,10 @@ class UltrasonicScannerInterface {
     } catch (error) {
       if ((error as Error).name !== 'NetworkError') {
         console.error('Data reading error:', error);
-        this.setConnectionStatus(`Data reading error: ${(error as Error).message}`, 'error');
+        this.setConnectionStatus(
+          `Data reading error: ${(error as Error).message}`,
+          'error'
+        );
       }
     } finally {
       if (this.reader) {
@@ -682,7 +753,8 @@ class UltrasonicScannerInterface {
     if (this.chartContainer) {
       this.chartContainer.style.display = 'none';
     }
-    if (this.channelSelectionContainer) { // NEW
+    if (this.channelSelectionContainer) {
+      // NEW
       this.channelSelectionContainer.style.display = 'none';
     }
     if (this.scanConfigDisplay) {
@@ -770,7 +842,7 @@ class UltrasonicScannerInterface {
     try {
       saveScanData(scan);
     } catch (error) {
-      console.error('Failed to save scan data: ', error)
+      console.error('Failed to save scan data: ', error);
     }
 
     this.scanCount++;
@@ -783,7 +855,9 @@ class UltrasonicScannerInterface {
     this.updateScanDisplay('good', 'SCAN COMPLETE ✓');
     this.displayScanConfiguration(scan.metadata.scanConfig);
     this.populateSelectors(scan.metadata.scanConfig);
-    this.showChartControls(() => { this.updateChart(); });
+    this.showChartControls(() => {
+      this.updateChart();
+    });
   }
 
   // 11. New method to update baseline availability
@@ -806,7 +880,11 @@ class UltrasonicScannerInterface {
       }
     }
 
-    console.log(`📋 Baseline availability updated: ${hasBaseline ? 'enabled' : 'disabled'}`);
+    console.log(
+      `📋 Baseline availability updated: ${
+        hasBaseline ? 'enabled' : 'disabled'
+      }`
+    );
     this.updateSelectionSummary();
   }
 
@@ -839,7 +917,9 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
         // Use label if available, otherwise default naming
         const label = config.angles[i]?.label || `Angle ${i}`;
-        option.textContent = `${label} (${config.angles[i]?.numSteps || 0} steps)`;
+        option.textContent = `${label} (${
+          config.angles[i]?.numSteps || 0
+        } steps)`;
 
         this.angleSelect.appendChild(option);
       }
@@ -861,7 +941,9 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const selectedAngle = config?.angles[selectedAngleIndex];
     const numSteps = selectedAngle?.numSteps || 0;
 
-    console.log(`📊 Updating step selector for angle ${selectedAngleIndex}: ${numSteps} steps available`);
+    console.log(
+      `📊 Updating step selector for angle ${selectedAngleIndex}: ${numSteps} steps available`
+    );
 
     this.stepSelect.innerHTML = '';
 
@@ -884,7 +966,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     this.stepSelect.value = '0';
   }
 
-  private showChartControls(func: () => void = () => { }): void {
+  private showChartControls(func: () => void = () => {}): void {
     console.log('📊 Showing chart controls and channel selection');
 
     if (this.chartControlsContainer) {
@@ -902,9 +984,12 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       // Force layout recalculation
       this.chartContainer.offsetHeight;
 
-      console.log('📊 Container dimensions after forcing:',
-        this.chartContainer.getBoundingClientRect().width, 'x',
-        this.chartContainer.getBoundingClientRect().height);
+      console.log(
+        '📊 Container dimensions after forcing:',
+        this.chartContainer.getBoundingClientRect().width,
+        'x',
+        this.chartContainer.getBoundingClientRect().height
+      );
     }
 
     // NEW: Show channel selection
@@ -927,7 +1012,12 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     // Final dimension check
     const rect = this.chartContainer.getBoundingClientRect();
-    console.log('📊 Final chart container dimensions:', rect.width, 'x', rect.height);
+    console.log(
+      '📊 Final chart container dimensions:',
+      rect.width,
+      'x',
+      rect.height
+    );
 
     if (rect.width === 0 || rect.height === 0) {
       console.error('📊 Chart container still has no dimensions, aborting');
@@ -947,7 +1037,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const initialOption = {
       title: {
         text: 'Ultrasonic Data - 64 Channels',
-        left: 'center'
+        left: 'center',
       },
       animation: false, // Disable animatio
       animationDuration: 0, // Disable animation duration
@@ -957,7 +1047,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       tooltip: {
         trigger: 'axis',
         axisPointer: {
-          type: 'cross'
+          type: 'cross',
         },
         padding: 5,
         textStyle: {
@@ -971,8 +1061,10 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
           // Add header with x-axis value
           if (params[0].axisValueLabel || params[0].name) {
-            html += '<div style="margin-bottom: 4px; font-weight: bold; font-size: 13px;">' +
-              (params[0].axisValueLabel || params[0].name) + '</div>';
+            html +=
+              '<div style="margin-bottom: 4px; font-weight: bold; font-size: 13px;">' +
+              (params[0].axisValueLabel || params[0].name) +
+              '</div>';
           }
 
           // Process each series with minimal bullets
@@ -982,32 +1074,39 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
             const name = param.seriesName || 'Channel ' + (i + 1);
             const value = param.value !== undefined ? param.value : 'N/A';
 
-            html += '<div style="display: flex; align-items: center; margin: 1px 0; font-size: 11px; line-height: 1.1;">' +
-              '<span style="display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: ' + color + '; margin-right: 5px; flex-shrink: 0;"></span>' +
-              '<span style="margin-right: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100px;">' + name + ':</span>' +
-              '<span style="font-weight: bold;">' + value + '</span>' +
+            html +=
+              '<div style="display: flex; align-items: center; margin: 1px 0; font-size: 11px; line-height: 1.1;">' +
+              '<span style="display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: ' +
+              color +
+              '; margin-right: 5px; flex-shrink: 0;"></span>' +
+              '<span style="margin-right: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100px;">' +
+              name +
+              ':</span>' +
+              '<span style="font-weight: bold;">' +
+              value +
+              '</span>' +
               '</div>';
           }
 
           return html;
-        }
+        },
       },
       legend: {
-        show: false
+        show: false,
       },
       grid: {
         left: '3%',
         right: '4%',
         bottom: '15%',
         top: '10%',
-        containLabel: true
+        containLabel: true,
       },
       xAxis: {
         type: 'category',
         name: 'Sample Index',
         nameLocation: 'middle',
         nameGap: 30,
-        data: [] as any// Empty initially
+        data: [] as any, // Empty initially
       },
       yAxis: {
         type: 'value',
@@ -1017,22 +1116,22 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         scale: true,
         min: -512,
         max: 512,
-        startFromZero: true
+        startFromZero: true,
       },
       dataZoom: [
         {
           type: 'inside',
           xAxisIndex: 0,
-          preventDefaultMouseMove: false
+          preventDefaultMouseMove: false,
         },
         {
           type: 'slider',
           xAxisIndex: 0,
           height: 20,
-          bottom: 30
-        }
+          bottom: 30,
+        },
       ],
-      series: [] as any// Empty initially
+      series: [] as any, // Empty initially
     };
 
     this.chart.setOption(initialOption);
@@ -1073,7 +1172,12 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
   // MODIFIED: Update chart to only show selected channels
   private updateChart2(): void {
-    if (!this.chart || !this.displayScanData || !this.angleSelect || !this.stepSelect) {
+    if (
+      !this.chart ||
+      !this.displayScanData ||
+      !this.angleSelect ||
+      !this.stepSelect
+    ) {
       console.warn('📊 Cannot update chart: missing dependencies');
       return;
     }
@@ -1102,7 +1206,10 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       key.startsWith(`${angleIndex}_${stepIndex}_`)
     );
 
-    console.log(`📊 Available data keys for angle ${angleIndex}, step ${stepIndex}:`, keysForThisAngleStep.length);
+    console.log(
+      `📊 Available data keys for angle ${angleIndex}, step ${stepIndex}:`,
+      keysForThisAngleStep.length
+    );
 
     const series: any[] = [];
     let maxSamples = 0;
@@ -1132,38 +1239,45 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
           symbol: 'none',
           lineStyle: {
             width: 1.5,
-            opacity: 0.8
+            opacity: 0.8,
           },
           itemStyle: {
-            color: this.getChannelColor(channel)
+            color: this.getChannelColor(channel),
           },
-          legendHoverLink: true
+          legendHoverLink: true,
         });
       }
     }
 
     const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
 
-    console.log(`📊 Chart update: ${channelsWithData}/${this.selectedChannels.size} selected channels have data, max samples: ${maxSamples}`);
+    console.log(
+      `📊 Chart update: ${channelsWithData}/${this.selectedChannels.size} selected channels have data, max samples: ${maxSamples}`
+    );
 
     try {
-      this.chart.setOption({
-        title: {
-          text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/${this.selectedChannels.size} selected channels)`
+      this.chart.setOption(
+        {
+          title: {
+            text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/${this.selectedChannels.size} selected channels)`,
+          },
+          xAxis: {
+            data: xAxisData,
+          },
+          series: series,
         },
-        xAxis: {
-          data: xAxisData
-        },
-        series: series
-      }, {
-        replaceMerge: 'series'
-      });
+        {
+          replaceMerge: 'series',
+        }
+      );
 
       console.log('📊 Chart updated successfully');
 
       // Show warning if no data available for selected channels
       if (channelsWithData === 0 && this.selectedChannels.size > 0) {
-        console.warn(`📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`);
+        console.warn(
+          `📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`
+        );
       }
     } catch (error) {
       console.error('📊 Failed to update chart:', error);
@@ -1172,7 +1286,12 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
   // 12. Update updateChart to include baseline data when selected
   private updateChart(): void {
-    if (!this.chart || !this.displayScanData || !this.angleSelect || !this.stepSelect) {
+    if (
+      !this.chart ||
+      !this.displayScanData ||
+      !this.angleSelect ||
+      !this.stepSelect
+    ) {
       console.warn('📊 Cannot update chart: missing dependencies');
       return;
     }
@@ -1181,7 +1300,11 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const stepIndex = parseInt(this.stepSelect.value) || 0;
 
     console.log(`📊 Updating chart for angle ${angleIndex}, step ${stepIndex}`);
-    console.log(`📊 Selected channels: ${this.selectedChannels.size}/64, baseline: ${this.showBaseline && this.baselineEnabled}`);
+    console.log(
+      `📊 Selected channels: ${this.selectedChannels.size}/64, baseline: ${
+        this.showBaseline && this.baselineEnabled
+      }`
+    );
 
     const series: any[] = [];
     let maxSamples = 0;
@@ -1210,12 +1333,12 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
           symbol: 'none',
           lineStyle: {
             width: 1.5,
-            opacity: 0.8
+            opacity: 0.8,
           },
           itemStyle: {
-            color: this.getChannelColor(channel)
+            color: this.getChannelColor(channel),
           },
-          legendHoverLink: true
+          legendHoverLink: true,
         });
       }
     }
@@ -1225,7 +1348,10 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       const baselineKey = `${angleIndex}_${stepIndex}_64`;
       const baselinePacket = this.displayScanData.dataPackets.get(baselineKey);
 
-      const hasBaselineData = baselinePacket && baselinePacket.samples && baselinePacket.samples.length > 0;
+      const hasBaselineData =
+        baselinePacket &&
+        baselinePacket.samples &&
+        baselinePacket.samples.length > 0;
       const baselineData = hasBaselineData ? baselinePacket.samples : [];
 
       if (hasBaselineData) {
@@ -1240,38 +1366,47 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
           lineStyle: {
             width: 2, // Slightly thicker for baseline
             opacity: 0.9,
-            type: 'dashed' // Dashed line to distinguish baseline
+            type: 'dashed', // Dashed line to distinguish baseline
           },
           itemStyle: {
-            color: '#ff4444' // Red color for baseline
+            color: '#ff4444', // Red color for baseline
           },
-          legendHoverLink: true
+          legendHoverLink: true,
         });
       }
     }
 
     const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
-    const totalSelected = this.selectedChannels.size + (this.showBaseline && this.baselineEnabled ? 1 : 0);
+    const totalSelected =
+      this.selectedChannels.size +
+      (this.showBaseline && this.baselineEnabled ? 1 : 0);
 
-    console.log(`📊 Chart update: ${channelsWithData}/${totalSelected} selected channels have data, max samples: ${maxSamples}`);
+    console.log(
+      `📊 Chart update: ${channelsWithData}/${totalSelected} selected channels have data, max samples: ${maxSamples}`
+    );
 
     try {
-      this.chart.setOption({
-        title: {
-          text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/${totalSelected} selected)`
+      this.chart.setOption(
+        {
+          title: {
+            text: `Ultrasonic Data - Angle ${angleIndex}, Step ${stepIndex} (${channelsWithData}/${totalSelected} selected)`,
+          },
+          xAxis: {
+            data: xAxisData,
+          },
+          series: series,
         },
-        xAxis: {
-          data: xAxisData
-        },
-        series: series
-      }, {
-        replaceMerge: 'series'
-      });
+        {
+          replaceMerge: 'series',
+        }
+      );
 
       console.log('📊 Chart updated successfully');
 
       if (channelsWithData === 0 && totalSelected > 0) {
-        console.warn(`📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`);
+        console.warn(
+          `📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`
+        );
       }
     } catch (error) {
       console.error('📊 Failed to update chart:', error);
@@ -1297,7 +1432,7 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
   }
 
   private getChannelColor(channel: number): string {
-    const hue = (channel * 360 / 64) % 360;
+    const hue = ((channel * 360) / 64) % 360;
     return `hsl(${hue}, 70%, 50%)`;
   }
 
@@ -1307,7 +1442,8 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const isConnecting = this.connectionState === 'connecting';
 
     if (this.connectButton) {
-      this.connectButton.disabled = !hasSelection || isConnected || isConnecting;
+      this.connectButton.disabled =
+        !hasSelection || isConnected || isConnecting;
     }
     if (this.disconnectButton) {
       this.disconnectButton.disabled = !isConnected;
@@ -1320,12 +1456,16 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     }
   }
 
-  private updateScanDisplay(status?: 'good' | 'bad' | 'waiting', message?: string): void {
+  private updateScanDisplay(
+    status?: 'good' | 'bad' | 'waiting',
+    message?: string
+  ): void {
     if (this.scanCounter) {
       this.scanCounter.textContent = `Scans Received: ${this.scanCount}`;
     }
 
-    const scanToDisplay = this.displayScanData || this.dataParser.getDisplayScan();
+    const scanToDisplay =
+      this.displayScanData || this.dataParser.getDisplayScan();
 
     if (scanToDisplay) {
       const scan = scanToDisplay;
@@ -1338,27 +1478,32 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         this.scanNameEl.textContent = metadata.scanConfig.name || '-';
       }
       if (this.numAnglesEl) {
-        this.numAnglesEl.textContent = metadata.scanConfig.numAngles?.toString() || '-';
+        this.numAnglesEl.textContent =
+          metadata.scanConfig.numAngles?.toString() || '-';
       }
       if (this.dataPacketCountEl) {
         this.dataPacketCountEl.textContent = scan.dataPackets.size.toString();
       }
 
       // FIXED: Use the correct calculation from metadata
-      const totalExpectedSteps = metadata.scanConfig.totalSteps ||
-        metadata.scanConfig.angles.reduce((sum: number, angle: any) => sum + (angle.numSteps || 0), 0);
+      const totalExpectedSteps =
+        metadata.scanConfig.totalSteps ||
+        metadata.scanConfig.angles.reduce(
+          (sum: number, angle: any) => sum + (angle.numSteps || 0),
+          0
+        );
       const expected = totalExpectedSteps * 64; // 64 channels per step
 
       if (this.expectedPacketsEl) {
         this.expectedPacketsEl.textContent = expected.toString();
       }
 
-      const progress = expected > 0 ? (scan.dataPackets.size / expected) * 100 : 0;
+      const progress =
+        expected > 0 ? (scan.dataPackets.size / expected) * 100 : 0;
       if (this.progressFill) {
         this.progressFill.style.width = `${progress}%`;
         this.progressFill.textContent = `${Math.round(progress)}%`;
       }
-
     } else {
       // Clear display
       if (this.bootIdEl) this.bootIdEl.textContent = '-';
@@ -1388,13 +1533,33 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
   private debugElementStatus(): void {
     console.log('🔍 Element Debug Status:');
-    console.log('- chartContainer:', !!this.chartContainer, this.chartContainer?.id);
-    console.log('- chartControlsContainer:', !!this.chartControlsContainer, this.chartControlsContainer?.id);
-    console.log('- scanConfigDisplay:', !!this.scanConfigDisplay, this.scanConfigDisplay?.id);
-    console.log('- channelSelectionContainer:', !!this.channelSelectionContainer, this.channelSelectionContainer?.id); // NEW
+    console.log(
+      '- chartContainer:',
+      !!this.chartContainer,
+      this.chartContainer?.id
+    );
+    console.log(
+      '- chartControlsContainer:',
+      !!this.chartControlsContainer,
+      this.chartControlsContainer?.id
+    );
+    console.log(
+      '- scanConfigDisplay:',
+      !!this.scanConfigDisplay,
+      this.scanConfigDisplay?.id
+    );
+    console.log(
+      '- channelSelectionContainer:',
+      !!this.channelSelectionContainer,
+      this.channelSelectionContainer?.id
+    ); // NEW
     console.log('- angleSelect:', !!this.angleSelect, this.angleSelect?.id);
     console.log('- stepSelect:', !!this.stepSelect, this.stepSelect?.id);
-    console.log('- updateChartButton:', !!this.updateChartButton, this.updateChartButton?.id);
+    console.log(
+      '- updateChartButton:',
+      !!this.updateChartButton,
+      this.updateChartButton?.id
+    );
 
     if (this.chartContainer) {
       const styles = window.getComputedStyle(this.chartContainer);

@@ -60,22 +60,17 @@ class UltrasonicScannerInterface {
   private runStopButton: HTMLButtonElement;
 
   // Display elements
-  private bootIdEl: HTMLElement;
-  private scanIdEl: HTMLElement;
-  private scanNameEl: HTMLElement;
   private numAnglesEl: HTMLElement;
   private dataPacketCountEl: HTMLElement;
   private expectedPacketsEl: HTMLElement;
-  private progressFill: HTMLElement;
   private scanResult: HTMLElement;
-  
 
   // Chart elements
   private angleSelect: HTMLSelectElement;
   private stepSelect: HTMLSelectElement;
   private updateChartButton: HTMLButtonElement;
   private chartContainer: HTMLElement;
-  private chartControlsContainer: HTMLElement;
+  //  private chartControlsContainer: HTMLElement;
   private scanConfigDisplay: HTMLElement;
   private scanConfigText: HTMLElement;
 
@@ -96,7 +91,7 @@ class UltrasonicScannerInterface {
   // Parser and data
   private dataParser: UltrasonicDataParser;
   private isRunning: boolean = false;
-  
+
   private displayScanData: ScanData | null = null;
   private waitingForScan: boolean = false;
 
@@ -107,8 +102,6 @@ class UltrasonicScannerInterface {
   private selectedChannels: Set<number> = new Set();
 
   constructor() {
-    console.log('🚀 Constructor: isRunning initial value =', this.isRunning);
-
     // Initialize all channels as selected by default
     for (let i = 0; i < 64; i++) {
       this.selectedChannels.add(i);
@@ -121,9 +114,6 @@ class UltrasonicScannerInterface {
     this.initializeChannelSelection(); // NEW
     this.startPortPolling();
     this.updateUI();
-
-    this.debugElementStatus();
-    this.verifyCSSLoaded();
   }
 
   private initializeElements(): void {
@@ -141,9 +131,6 @@ class UltrasonicScannerInterface {
       'runStopButton'
     ) as HTMLButtonElement;
 
-    this.bootIdEl = document.getElementById('bootId') as HTMLElement;
-    this.scanIdEl = document.getElementById('scanId') as HTMLElement;
-    this.scanNameEl = document.getElementById('scanName') as HTMLElement;
     this.numAnglesEl = document.getElementById('numAngles') as HTMLElement;
     this.dataPacketCountEl = document.getElementById(
       'dataPacketCount'
@@ -151,9 +138,6 @@ class UltrasonicScannerInterface {
     this.expectedPacketsEl = document.getElementById(
       'expectedPackets'
     ) as HTMLElement;
-    this.progressFill = document.getElementById('progressFill') as HTMLElement;
-    this.scanResult = document.getElementById('scanResult') as HTMLElement;
-
 
     this.angleSelect = document.getElementById(
       'angleSelect'
@@ -167,9 +151,9 @@ class UltrasonicScannerInterface {
     this.chartContainer = document.getElementById(
       'chartContainer'
     ) as HTMLElement;
-    this.chartControlsContainer = document.getElementById(
-      'chartControlsContainer'
-    ) as HTMLElement;
+    // this.chartControlsContainer = document.getElementById(
+    //   'chartControlsContainer'
+    // ) as HTMLElement;
     this.scanConfigDisplay = document.getElementById(
       'scanConfigDisplay'
     ) as HTMLElement;
@@ -409,12 +393,11 @@ class UltrasonicScannerInterface {
           16
         )}`
       );
-      };
-
+    };
 
     this.dataParser.onParseError = (error: string, data: Uint8Array) => {
       console.error('Parse error:', error);
-      };
+    };
   }
 
   private initializeEventListeners(): void {
@@ -482,7 +465,7 @@ class UltrasonicScannerInterface {
 
   private async scanPorts(): Promise<void> {
     if (!('serial' in navigator)) {
-        return;
+      return;
     }
 
     try {
@@ -506,7 +489,7 @@ class UltrasonicScannerInterface {
       }
     } catch (error) {
       console.error('Error scanning ports:', error);
-      }
+    }
   }
 
   private hasPortListChanged(newPorts: SerialPort[]): boolean {
@@ -598,7 +581,7 @@ class UltrasonicScannerInterface {
 
   private async connectToSelectedPort(): Promise<void> {
     if (!this.selectedPort) {
-        return;
+      return;
     }
 
     this.connectionState = 'connecting';
@@ -620,7 +603,6 @@ class UltrasonicScannerInterface {
     } catch (error) {
       console.error('Connection error:', error);
       this.connectionState = 'error';
-
 
       setTimeout(() => {
         if (this.connectionState === 'error') {
@@ -658,7 +640,6 @@ class UltrasonicScannerInterface {
     } catch (error) {
       if ((error as Error).name !== 'NetworkError') {
         console.error('Data reading error:', error);
-
       }
     } finally {
       if (this.reader) {
@@ -691,21 +672,6 @@ class UltrasonicScannerInterface {
     // Cleanup chart
     this.cleanupChart();
 
-    // Hide chart controls and channel selection
-    if (this.chartControlsContainer) {
-      
-    }
-    if (this.chartContainer) {
-      
-    }
-    if (this.channelSelectionContainer) {
-      // NEW
-      
-    }
-    if (this.scanConfigDisplay) {
-      
-    }
-
     this.dataParser.reset();
     this.updateUI();
     this.updateScanDisplay();
@@ -723,7 +689,7 @@ class UltrasonicScannerInterface {
 
     setTimeout(() => {
       if (this.connectionState === 'disconnected') {
-          }
+      }
     }, 3000);
   }
 
@@ -783,7 +749,6 @@ class UltrasonicScannerInterface {
       console.error('Failed to save scan data: ', error);
     }
 
-
     this.displayScanData = scan;
 
     this.isRunning = false;
@@ -807,12 +772,10 @@ Pattern Segments: ${config.numPatternSegments}
 Repeat Count: ${config.repeatCount}
 Tail Count: ${config.tailCount}
 TX Start Delay: ${config.txStartDel}
-TR Switch Delay Mode: ${config.trSwDelMode}
 Capture Window: ${config.captureStartUs}μs - ${config.captureEndUs}μs
 Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     this.scanConfigText.textContent = configText;
-    
   }
 
   private populateSelectors(config: any): void {
@@ -851,10 +814,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const selectedAngle = config?.angles[selectedAngleIndex];
     const numSteps = selectedAngle?.numSteps || 0;
 
-    console.log(
-      `📊 Updating step selector for angle ${selectedAngleIndex}: ${numSteps} steps available`
-    );
-
     this.stepSelect.innerHTML = '';
 
     if (numSteps === 0) {
@@ -877,19 +836,12 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
   }
 
   private showChartControls(func: () => void = () => {}): void {
-    console.log('📊 Showing chart controls and channel selection');
-
-    if (this.chartControlsContainer) {
-      
-    }
-
     if (this.chartContainer) {
       // Force explicit dimensions BEFORE showing
-      
+
       this.chartContainer.style.width = '100%';
       this.chartContainer.style.height = '400px';
       this.chartContainer.style.minHeight = '400px';
-      
 
       // Force layout recalculation
       this.chartContainer.offsetHeight;
@@ -904,7 +856,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     // NEW: Show channel selection
     if (this.channelSelectionContainer) {
-      
     }
 
     // Small delay to ensure layout is computed
@@ -1092,11 +1043,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       return;
     }
 
-    // ds suggested, not tried yet.
-    // if (!this.chart.isDisposed()) {
-    //   this.chart.clear();
-    // }
-
     if (this.chart.isDisposed()) {
       console.warn('📊 Chart is disposed, reinitializing...');
       this.chart = null;
@@ -1106,9 +1052,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     const angleIndex = parseInt(this.angleSelect.value) || 0;
     const stepIndex = parseInt(this.stepSelect.value) || 0;
-
-    console.log(`📊 Updating chart for angle ${angleIndex}, step ${stepIndex}`);
-    console.log(`📊 Selected channels: ${this.selectedChannels.size}/64`);
 
     // Debug: Check what data keys are available
     const availableKeys = Array.from(this.displayScanData.dataPackets.keys());
@@ -1161,10 +1104,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
     const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
 
-    console.log(
-      `📊 Chart update: ${channelsWithData}/${this.selectedChannels.size} selected channels have data, max samples: ${maxSamples}`
-    );
-
     try {
       this.chart.setOption(
         {
@@ -1202,15 +1141,11 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       !this.angleSelect ||
       !this.stepSelect
     ) {
-      console.warn('📊 Cannot update chart: missing dependencies');
       return;
     }
 
     const angleIndex = parseInt(this.angleSelect.value) || 0;
     const stepIndex = parseInt(this.stepSelect.value) || 0;
-
-    console.log(`📊 Updating chart for angle ${angleIndex}, step ${stepIndex}`);
-    console.log(`📊 Selected channels: ${this.selectedChannels.size}/64`);
 
     const series: any[] = [];
     let maxSamples = 0;
@@ -1252,10 +1187,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     const xAxisData = Array.from({ length: maxSamples }, (_, i) => i);
     const totalSelected = this.selectedChannels.size;
 
-    console.log(
-      `📊 Chart update: ${channelsWithData}/${totalSelected} selected channels have data, max samples: ${maxSamples}`
-    );
-
     try {
       this.chart.setOption(
         {
@@ -1272,8 +1203,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
         }
       );
 
-      console.log('📊 Chart updated successfully');
-
       if (channelsWithData === 0 && totalSelected > 0) {
         console.warn(
           `📊 No data available for selected channels in Angle ${angleIndex}, Step ${stepIndex}`
@@ -1286,7 +1215,6 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 
   private cleanupChart(): void {
     if (this.chart) {
-      
       try {
         // Call custom cleanup if it exists
         if ((this.chart as any)._cleanupResize) {
@@ -1331,20 +1259,13 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
     status?: 'good' | 'bad' | 'waiting',
     message?: string
   ): void {
-
-
-    const scanToDisplay = this.displayScanData || this.dataParser.getDisplayScan();
+    const scanToDisplay =
+      this.displayScanData || this.dataParser.getDisplayScan();
 
     if (scanToDisplay) {
       const scan = scanToDisplay;
       const metadata = scan.metadata;
 
-      if (this.scanIdEl) {
-        this.scanIdEl.textContent = scan.scanId.toString();
-      }
-      if (this.scanNameEl) {
-        this.scanNameEl.textContent = metadata.scanConfig.name || '-';
-      }
       if (this.numAnglesEl) {
         this.numAnglesEl.textContent =
           metadata.scanConfig.numAngles?.toString() || '-';
@@ -1365,107 +1286,16 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
       if (this.expectedPacketsEl) {
         this.expectedPacketsEl.textContent = expected.toString();
       }
-
-      const progress =
-        expected > 0 ? (scan.dataPackets.size / expected) * 100 : 0;
-      if (this.progressFill) {
-        this.progressFill.style.width = `${progress}%`;
-        this.progressFill.textContent = `${Math.round(progress)}%`;
-      }
     } else {
       // Clear display
-      if (this.bootIdEl) this.bootIdEl.textContent = '-';
-      if (this.scanIdEl) this.scanIdEl.textContent = '-';
-      if (this.scanNameEl) this.scanNameEl.textContent = '-';
       if (this.numAnglesEl) this.numAnglesEl.textContent = '-';
       if (this.dataPacketCountEl) this.dataPacketCountEl.textContent = '0';
       if (this.expectedPacketsEl) this.expectedPacketsEl.textContent = '-';
-      if (this.progressFill) {
-        this.progressFill.style.width = '0%';
-        this.progressFill.textContent = '0%';
-      }
     }
 
     if (status && message && this.scanResult) {
       this.scanResult.className = `scan-result ${status}`;
       this.scanResult.textContent = message;
-    }
-  }
-
-
-  private debugElementStatus(): void {
-    console.log('🔍 Element Debug Status:');
-    console.log(
-      '- chartContainer:',
-      !!this.chartContainer,
-      this.chartContainer?.id
-    );
-    console.log(
-      '- chartControlsContainer:',
-      !!this.chartControlsContainer,
-      this.chartControlsContainer?.id
-    );
-    console.log(
-      '- scanConfigDisplay:',
-      !!this.scanConfigDisplay,
-      this.scanConfigDisplay?.id
-    );
-    console.log(
-      '- channelSelectionContainer:',
-      !!this.channelSelectionContainer,
-      this.channelSelectionContainer?.id
-    ); // NEW
-    console.log('- angleSelect:', !!this.angleSelect, this.angleSelect?.id);
-    console.log('- stepSelect:', !!this.stepSelect, this.stepSelect?.id);
-    console.log(
-      '- updateChartButton:',
-      !!this.updateChartButton,
-      this.updateChartButton?.id
-    );
-
-    if (this.chartContainer) {
-      const styles = window.getComputedStyle(this.chartContainer);
-      console.log('📊 Chart container computed styles:');
-      console.log('- display:', styles.display);
-      console.log('- width:', styles.width);
-      console.log('- height:', styles.height);
-      console.log('- min-height:', styles.minHeight);
-    }
-  }
-
-  private verifyCSSLoaded(): void {
-    if (this.chartContainer) {
-      // Test 1: Check if basic CSS is applied
-      const testEl = document.createElement('div');
-      testEl.id = 'chartContainer';
-      testEl.style.visibility = 'hidden';
-      testEl.style.position = 'absolute';
-      testEl.style.top = '-9999px';
-      document.body.appendChild(testEl);
-
-      const styles1 = window.getComputedStyle(testEl);
-      console.log('🎨 CSS Test 1 (hidden):');
-      console.log('- display:', styles1.display);
-      console.log('- height:', styles1.height);
-      console.log('- width:', styles1.width);
-
-      // Test 2: Check if chart-visible class works
-      testEl.classList.add('chart-visible');
-      const styles2 = window.getComputedStyle(testEl);
-      console.log('🎨 CSS Test 2 (chart-visible):');
-      console.log('- display:', styles2.display);
-      console.log('- height:', styles2.height);
-      console.log('- width:', styles2.width);
-
-      document.body.removeChild(testEl);
-
-      // Test 3: Check actual chart container styles after forcing
-      console.log('🎨 CSS Test 3 (actual container):');
-      const actualStyles = window.getComputedStyle(this.chartContainer);
-      console.log('- display:', actualStyles.display);
-      console.log('- height:', actualStyles.height);
-      console.log('- width:', actualStyles.width);
-      console.log('- min-height:', actualStyles.minHeight);
     }
   }
 }
@@ -1474,6 +1304,5 @@ Samples per Channel: ${20 * (config.captureEndUs - config.captureStartUs)}`;
 document.addEventListener('DOMContentLoaded', () => {
   if ('serial' in navigator) {
     new UltrasonicScannerInterface();
-  } else {
   }
 });

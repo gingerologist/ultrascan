@@ -103,7 +103,7 @@ export class UltrasonicDataParser {
   private buffer: Uint8Array = new Uint8Array(0);
   private currentScan: ScanData | null = null;
   // key: "bootId_scanId"
-    private scans: Map<string, ScanData> = new Map();
+  private scans: Map<string, ScanData> = new Map();
 
   // TODO: remove this
   // Sync pattern for packet alignment (fixed boot ID in little-endian)
@@ -777,7 +777,7 @@ export class UltrasonicDataParser {
   }
 
   public getDisplayScan(): ScanData | null {
-      return this.currentScan;
+    return this.currentScan;
   }
 
   public getScan(bootId: number, scanId: number): ScanData | null {

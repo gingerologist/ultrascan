@@ -13,10 +13,15 @@ import { rendererConfig } from './webpack.renderer.config';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true
+    asar: true,
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
+  makers: [
+    new MakerSquirrel({}),
+    new MakerZIP({}, ['darwin']),
+    new MakerRpm({}),
+    new MakerDeb({}),
+  ],
   plugins: [
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
@@ -27,19 +32,19 @@ const config: ForgeConfig = {
           {
             name: 'main_window',
             html: './src/index.html',
-            js: './src/renderer.ts',
+            js: './src/renderer.tsx',
             preload: {
               js: './src/preload.ts',
             },
           },
           {
-            name: 'modal_window',       // the order of the property matters
+            name: 'modal_window', // the order of the property matters
             html: './src/modal.html',
-            js: './src/modal.tsx',       // there must be one file designated.
+            js: './src/modal.tsx', // there must be one file designated.
             preload: {
-              js: './src/preload.ts'
+              js: './src/preload.ts',
             },
-          }
+          },
         ],
       },
     }),

@@ -1,4 +1,5 @@
 /*
+ * console.log examples
   SerialPort.list() [
     {
       path: 'COM14',
@@ -37,30 +38,32 @@
   }
  */
 
-/**
- * The Rongbuk device does not have built-in id, for display and establish a connection
- *
- * In serial case, friendly name and path (com port) suffices.
- * In network case, name and addresses sufficies.
- */
-
 export type ConnectionState = 'CONNECTED' | 'DISCONNECTED';
 
+/**
+ * Rongbuk is the codename of the ultrasonic scanner hardware in this project
+ */
 export interface RongbukDevice {
   connectionState: ConnectionState; // CONNECTED, DISCONNECTED
   name: string; // friendly name for serial case, name for network case
   location: string | string[]; // string for comport path, string[] for addreses.
 }
 
-export interface ConnectionRequest {
-  deviceId: string;
-  type: 'serial' | 'network';
-  serialData?: SerialDevice;
-  networkData?: NetworkDevice;
-}
-
 // Minimal IPC channels
 export interface IPCChannels {
-  'select-device-candidate': RongbukDevice;
-  'select-device': RongbukDevice;
+  // main process reports to browser window that a rongbuk device is discovered
+  'device-discovered': RongbukDevice;
+
+  // main process reports to browser window that a rongbuk device is connected
+  'device-connected': RongbukDevice;
+
+  // main process reports to browser window that a rongbuk device is disconnected
+  'device-disconnected': RongbukDevice;
+
+  // browser window tells main process that the user just opened a dialog or dropdown
+  // list, the available device list needs to be populated.
+  'user-discover-device': void;
+
+  // browser window tells main process that the user just selected a device to connect
+  'user-select-device': RongbukDevice;
 }

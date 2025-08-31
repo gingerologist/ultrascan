@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+import { RongbukDevice } from './types/devices';
+import { IpcRendererEvent } from 'electron';
+
+import DeviceConnection from './DeviceConnection';
+import type { ScanConfig } from './parser';
+import ControlPanel from './ControlPanel';
+import type { JsonConfig } from './ControlPanel';
+
+const { ipcRenderer } = window.require('electron');
 // Mock ScanChart component - replace with your actual import
 const ScanChart = ({ scanData }: { scanData: any }) => {
   if (!scanData) {
@@ -58,104 +67,83 @@ const ScanChart = ({ scanData }: { scanData: any }) => {
   );
 };
 
-type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
-
-interface SerialDevice {
-  id: string;
-  name: string;
-}
-
 const UltrasonicScannerApp: React.FC = () => {
-  // Connection state
-  const [connectionState, setConnectionState] =
-    useState<ConnectionState>('disconnected');
-  const [availableDevices, setAvailableDevices] = useState<SerialDevice[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string>('');
-
   // Scan data
+  const [currentConfig, setCurrentConfig] = useState(null);
   const [scanData, setScanData] = useState<any>(null);
+  const [devices, setDevices] = useState<RongbukDevice[]>([]);
 
-  // Mock device list - in real app, this would come from main process via IPC
+  const handleDeviceUpdate = (
+    event: IpcRendererEvent,
+    device: RongbukDevice
+  ) => {
+    console.log('device udpate', device);
+    setDevices(prevDevices => {
+      const index = prevDevices.findIndex(x => x.name === device.name);
+      if (index < 0) {
+        return [...prevDevices, device];
+      } else {
+        return [
+          ...prevDevices.slice(0, index),
+          device,
+          ...prevDevices.slice(index + 1),
+        ];
+      }
+    });
+  };
+
   useEffect(() => {
-    // Simulate device discovery
-    const mockDevices = [
-      { id: 'COM3', name: 'CH340 USB Serial (COM3)' },
-      { id: 'COM4', name: 'FTDI USB Serial (COM4)' },
-    ];
-    setAvailableDevices(mockDevices);
-  }, []);
-
-  // Mock IPC communication - replace with actual electron IPC calls
-  const sendToMainProcess = useCallback((channel: string, data?: any) => {
-    console.log(`IPC Send: ${channel}`, data);
-
-    // Mock responses for demonstration
-    if (channel === 'serial:connect') {
-      setConnectionState('connecting');
-      setTimeout(() => {
-        setConnectionState('connected');
-        console.log('Mock: Connected to device');
-      }, 1000);
-    } else if (channel === 'serial:disconnect') {
-      setConnectionState('disconnected');
-      setScanData(null);
-      console.log('Mock: Disconnected from device');
-    }
+    ipcRenderer.on('device-update', handleDeviceUpdate);
+    return () => ipcRenderer.off('device-update', handleDeviceUpdate);
   }, []);
 
   // Mock scan data reception - in real app, this would come from main process
-  useEffect(() => {
-    if (connectionState === 'connected') {
-      // Simulate receiving scan data after a few seconds
-      const timer = setTimeout(() => {
-        const mockScanData = {
-          config: {
-            name: 'Test Scan',
-            numAngles: 3,
-            captureStartUs: 50,
-            captureEndUs: 200,
-            angles: [
-              { numSteps: 10, label: '0 degrees' },
-              { numSteps: 12, label: '45 degrees' },
-              { numSteps: 8, label: '90 degrees' },
-            ],
-          },
-          data: {
-            angles: [
-              {
-                index: 0,
-                label: '0 degrees',
-                steps: [
-                  { index: 0, channels: [] }, // Mock empty for now
-                  { index: 1, channels: [] },
-                ],
-              },
-            ],
-          },
-        };
-        setScanData(mockScanData);
-      }, 3000);
+  // useEffect(() => {
+  //   // Simulate receiving scan data after some time
+  //   const timer = setTimeout(() => {
+  //     const mockScanData = {
+  //       config: {
+  //         name: 'Test Scan',
+  //         numAngles: 3,
+  //         captureStartUs: 50,
+  //         captureEndUs: 200,
+  //         angles: [
+  //           { numSteps: 10, label: '0 degrees' },
+  //           { numSteps: 12, label: '45 degrees' },
+  //           { numSteps: 8, label: '90 degrees' },
+  //         ],
+  //       },
+  //       data: {
+  //         angles: [
+  //           {
+  //             index: 0,
+  //             label: '0 degrees',
+  //             steps: [
+  //               { index: 0, channels: [] },
+  //               { index: 1, channels: [] },
+  //             ],
+  //           },
+  //         ],
+  //       },
+  //     };
+  //     setScanData(mockScanData);
+  //   }, 5000); // Show scan data after 5 seconds
 
-      return () => clearTimeout(timer);
-    }
-  }, [connectionState]);
+  //   return () => clearTimeout(timer);
+  // }, []);
 
-  const handleConnect = useCallback(() => {
-    if (!selectedDevice) {
-      alert('Please select a device first');
-      return;
-    }
-    sendToMainProcess('serial:connect', { deviceId: selectedDevice });
-  }, [selectedDevice, sendToMainProcess]);
+  const onDeviceConnect = (device: RongbukDevice): void => {
+    setImmediate(() => ipcRenderer.send('user-connect-device', device));
+  };
 
-  const handleDisconnect = useCallback(() => {
-    sendToMainProcess('serial:disconnect');
-  }, [sendToMainProcess]);
+  const onDeviceDisconnect = (device: RongbukDevice): void => {
+    setImmediate(() => ipcRenderer.send('user-disconnect-device', device));
+  };
 
-  const isConnected = connectionState === 'connected';
-  const isConnecting = connectionState === 'connecting';
-  const hasDeviceSelected = selectedDevice !== '';
-
+  const onDeviceRefresh = (): void => {
+    setDevices([]);
+    setImmediate(() => ipcRenderer.send('user-refresh-devices'));
+  };
   return (
     <div
       style={{
@@ -165,158 +153,23 @@ const UltrasonicScannerApp: React.FC = () => {
         padding: '20px',
       }}
     >
-      <h1>Ultrasonic Scanner Interface</h1>
+      {/* Device Connection */}
+      <DeviceConnection
+        devices={devices}
+        onConnect={onDeviceConnect}
+        onDisconnect={onDeviceDisconnect}
+        onRefresh={onDeviceRefresh}
+      />
 
-      {/* Connection Controls */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px',
-          marginBottom: '30px',
+      <ControlPanel
+        onConfigChange={(config: JsonConfig) => {
+          setCurrentConfig(config);
+          console.log('Configuration updated:', config);
         }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '15px',
-            padding: '15px',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            backgroundColor: '#f9f9f9',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              flex: 1,
-            }}
-          >
-            <label style={{ fontWeight: 'bold', minWidth: '120px' }}>
-              Serial Device:
-            </label>
-            <select
-              value={selectedDevice}
-              onChange={e => setSelectedDevice(e.target.value)}
-              disabled={isConnected || isConnecting}
-              style={{
-                flex: 1,
-                padding: '8px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '14px',
-                minWidth: '200px',
-                backgroundColor:
-                  isConnected || isConnecting ? '#f5f5f5' : '#fff',
-                color: isConnected || isConnecting ? '#999' : '#000',
-              }}
-            >
-              <option value="">
-                {availableDevices.length === 0
-                  ? 'No devices found'
-                  : 'Select a device...'}
-              </option>
-              {availableDevices.map(device => (
-                <option key={device.id} value={device.id}>
-                  {device.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <button
-              onClick={handleConnect}
-              disabled={!hasDeviceSelected || isConnected || isConnecting}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '14px',
-                cursor:
-                  !hasDeviceSelected || isConnected || isConnecting
-                    ? 'not-allowed'
-                    : 'pointer',
-                minWidth: '80px',
-                backgroundColor:
-                  !hasDeviceSelected || isConnected || isConnecting
-                    ? '#6c757d'
-                    : '#007bff',
-                color: '#fff',
-                opacity:
-                  !hasDeviceSelected || isConnected || isConnecting ? 0.6 : 1,
-              }}
-            >
-              {isConnecting ? 'Connecting...' : 'Connect'}
-            </button>
-
-            <button
-              onClick={handleDisconnect}
-              disabled={!isConnected}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '14px',
-                cursor: !isConnected ? 'not-allowed' : 'pointer',
-                minWidth: '80px',
-                backgroundColor: !isConnected ? '#6c757d' : '#007bff',
-                color: '#fff',
-                opacity: !isConnected ? 0.6 : 1,
-              }}
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-
-        {/* Connection Status */}
-        <div
-          style={{
-            padding: '15px',
-            borderRadius: '5px',
-            border: '1px solid #dee2e6',
-            minHeight: '20px',
-            backgroundColor:
-              connectionState === 'connected'
-                ? '#d4edda'
-                : connectionState === 'connecting'
-                ? '#fff3cd'
-                : connectionState === 'error'
-                ? '#f8d7da'
-                : '#f8d7da',
-            color:
-              connectionState === 'connected'
-                ? '#155724'
-                : connectionState === 'connecting'
-                ? '#856404'
-                : connectionState === 'error'
-                ? '#721c24'
-                : '#721c24',
-            borderColor:
-              connectionState === 'connected'
-                ? '#c3e6cb'
-                : connectionState === 'connecting'
-                ? '#ffeaa7'
-                : connectionState === 'error'
-                ? '#f5c6cb'
-                : '#f5c6cb',
-          }}
-        >
-          {connectionState === 'connected' &&
-            'Connected to device - ready for scanning'}
-          {connectionState === 'connecting' && 'Connecting to device...'}
-          {connectionState === 'disconnected' &&
-            'Disconnected - select a device and connect'}
-          {connectionState === 'error' && 'Connection error - please try again'}
-        </div>
-      </div>
+      />
 
       {/* Control Panel */}
-      <div
+      {/* <div
         style={{
           marginBottom: '30px',
           padding: '20px',
@@ -342,7 +195,7 @@ const UltrasonicScannerApp: React.FC = () => {
           Future features: pattern configuration, angle settings, capture
           parameters.
         </div>
-      </div>
+      </div> */}
 
       {/* Scan Results */}
       <div

@@ -12,10 +12,9 @@ const ModalApp: React.FC = () => {
       setDevices(prev => [...prev, device]);
     };
 
-    ipcRenderer.on('select-device-candidate', handleDeviceAvailable);
+    ipcRenderer.on('device-discovered', handleDeviceAvailable);
 
-    return () =>
-      ipcRenderer.off('select-device-candidate', handleDeviceAvailable);
+    return () => ipcRenderer.off('device-discovered', handleDeviceAvailable);
   }, []);
 
   return (
@@ -29,7 +28,9 @@ const ModalApp: React.FC = () => {
             <li key={device.name} style={{ marginBottom: '10px' }}>
               <strong>{device.name}</strong> ({device.location})
               <button
-                onClick={() => ipcRenderer.send('select-device', device)}
+                onClick={() => {
+                  ipcRenderer.send('user-select-device', device);
+                }}
                 style={{ marginLeft: '10px', padding: '5px 10px' }}
               >
                 Connect

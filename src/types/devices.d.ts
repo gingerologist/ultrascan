@@ -38,7 +38,11 @@
   }
  */
 
-export type ConnectionState = 'CONNECTED' | 'DISCONNECTED';
+export type ConnectionState =
+  | 'CONNECTED'
+  | 'DISCONNECTED'
+  | 'CONNECTING'
+  | 'DISCONNECTING';
 
 /**
  * Rongbuk is the codename of the ultrasonic scanner hardware in this project
@@ -52,7 +56,7 @@ export interface RongbukDevice {
 // Minimal IPC channels
 export interface IPCChannels {
   // main process reports to browser window that a rongbuk device is discovered
-  'device-discovered': RongbukDevice;
+  'device-update': RongbukDevice;
 
   // main process reports to browser window that a rongbuk device is connected
   'device-connected': RongbukDevice;
@@ -62,8 +66,9 @@ export interface IPCChannels {
 
   // browser window tells main process that the user just opened a dialog or dropdown
   // list, the available device list needs to be populated.
-  'user-discover-device': void;
+  'user-refresh-devices': void;
 
   // browser window tells main process that the user just selected a device to connect
-  'user-select-device': RongbukDevice;
+  'user-connect-device': RongbukDevice;
+  'user-disconnect-device': RongbukDevice;
 }

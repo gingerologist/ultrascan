@@ -1,0 +1,744 @@
+import React, { useState, useCallback } from 'react';
+
+// Type definitions matching your schema
+interface JsonAngle {
+  degree: number;
+  masks: number[];
+}
+
+type JsonPatternSegment = [number, number]; // [duration, level]
+type CharPattenLevel = 'F' | 'M' | 'P' | 'G';
+
+export interface JsonConfig {
+  version: string;
+  name: string;
+  angles: JsonAngle[];
+  patterns: JsonPatternSegment[]; // Changed from 'pattern' to 'patterns' to match schema
+  repeat: number;
+  tail: number;
+  txStartDel: number;
+  startUs: number;
+  endUs: number;
+}
+
+interface ControlPanelProps {
+  onConfigChange?: (config: JsonConfig) => void;
+}
+
+const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
+  onConfigChange,
+}) => {
+  const [config, setConfig] = useState<JsonConfig>({
+    version: '1.0',
+    name: '',
+    angles: [],
+    patterns: [], // Changed from 'pattern' to 'patterns'
+    repeat: 1,
+    tail: 0,
+    txStartDel: -1,
+    startUs: 20,
+    endUs: 22,
+  });
+
+  const [jsonOutput, setJsonOutput] = useState('');
+  const [showJson, setShowJson] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+
+  // Angle management
+  const [newAngleDegree, setNewAngleDegree] = useState<string>('0');
+  const [selectedAngleIndex, setSelectedAngleIndex] = useState(-1);
+
+  // Pattern management
+  const [newPatternDuration, setNewPatternDuration] = useState(1);
+  const [newPatternLevel, setNewPatternLevel] = useState<CharPattenLevel>('F');
+  const [selectedPatternIndex, setSelectedPatternIndex] = useState(-1);
+
+  const levelMap: Record<CharPattenLevel, number> = {
+    F: 0, // Float
+    M: 1, // Minus (negative)
+    P: 2, // Positive
+    G: 3, // Ground
+  };
+
+  const levelDisplayMap: Record<number, string> = {
+    0: 'F (Float)',
+    1: 'M (Minus)',
+    2: 'P (Positive)',
+    3: 'G (Ground)',
+  };
+
+  // Generate default mask (all zeros for simplicity)
+  const generateDefaultMask = () => {
+    return new Array(32).fill(0);
+  };
+
+  // Validate configuration
+  const validateConfig = useCallback((configToValidate: JsonConfig) => {
+    const newErrors: string[] = [];
+
+    // Check name length
+    if (configToValidate.name.length > 31) {
+      newErrors.push('Name must be 31 characters or less');
+    }
+
+    // Check angles uniqueness
+    const degrees = configToValidate.angles.map(a => a.degree);
+    const uniqueDegrees = [...new Set(degrees)];
+    if (degrees.length !== uniqueDegrees.length) {
+      newErrors.push('All angle degrees must be unique');
+    }
+
+    // Check endUs > startUs
+    if (configToValidate.endUs <= configToValidate.startUs) {
+      newErrors.push('End time must be greater than start time');
+    }
+
+    // Check required arrays
+    if (configToValidate.angles.length === 0) {
+      newErrors.push('At least one angle is required');
+    }
+
+    if (configToValidate.patterns.length === 0) {
+      newErrors.push('At least one pattern is required');
+    }
+
+    setErrors(newErrors);
+    return newErrors.length === 0;
+  }, []);
+
+  const updateConfig = useCallback(
+    (updates: Partial<JsonConfig>) => {
+      const newConfig = { ...config, ...updates };
+      setConfig(newConfig);
+      validateConfig(newConfig);
+
+      if (onConfigChange) {
+        onConfigChange(newConfig);
+      }
+    },
+    [config, onConfigChange, validateConfig]
+  );
+
+  // Angle management functions
+  const addAngle = () => {
+    const degree = parseInt(newAngleDegree);
+    if (degree < -45 || degree > 45) {
+      alert('Degree must be between -45 and 45');
+      return;
+    }
+
+    const existingDegrees = config.angles.map(a => a.degree);
+    if (existingDegrees.includes(degree)) {
+      alert('This degree already exists. All degrees must be unique.');
+      return;
+    }
+
+    if (config.angles.length >= 91) {
+      alert('Maximum 91 angles allowed');
+      return;
+    }
+
+    const newAngle = {
+      degree: degree,
+      masks: generateDefaultMask(),
+    };
+
+    updateConfig({
+      angles: [...config.angles, newAngle],
+    });
+    setNewAngleDegree('0');
+  };
+
+  const removeAngle = (index: number) => {
+    const newAngles = config.angles.filter((_, i) => i !== index);
+    updateConfig({ angles: newAngles });
+    setSelectedAngleIndex(-1);
+  };
+
+  const generateAngleRange = () => {
+    const start = -45;
+    const end = 45;
+    const step = 5; // Generate every 5 degrees
+
+    const newAngles = [];
+    for (let degree = start; degree <= end; degree += step) {
+      if (!config.angles.some(a => a.degree === degree)) {
+        newAngles.push({
+          degree: degree,
+          masks: generateDefaultMask(),
+        });
+      }
+    }
+
+    if (config.angles.length + newAngles.length > 91) {
+      alert(
+        `Cannot add ${newAngles.length} angles. Maximum total is 91 angles.`
+      );
+      return;
+    }
+
+    updateConfig({
+      angles: [...config.angles, ...newAngles].sort(
+        (a, b) => a.degree - b.degree
+      ),
+    });
+  };
+
+  // Pattern management functions
+  const addPattern = () => {
+    const duration =
+      typeof newPatternDuration === 'string'
+        ? parseInt(newPatternDuration)
+        : newPatternDuration;
+    const level = levelMap[newPatternLevel];
+
+    if (duration < 1 || duration > 31) {
+      alert('Duration must be between 1 and 31 clocks');
+      return;
+    }
+
+    if (config.patterns.length >= 16) {
+      alert('Maximum 16 patterns allowed');
+      return;
+    }
+
+    const newPattern: JsonPatternSegment = [duration, level];
+    updateConfig({
+      patterns: [...config.patterns, newPattern],
+    });
+    setNewPatternDuration(1);
+    setNewPatternLevel('F');
+  };
+
+  const removePattern = (index: number) => {
+    const newPatterns = config.patterns.filter((_, i) => i !== index);
+    updateConfig({ patterns: newPatterns });
+    setSelectedPatternIndex(-1);
+  };
+
+  const generateConfig = () => {
+    if (!validateConfig(config)) {
+      alert('Please fix the errors before generating JSON');
+      return;
+    }
+
+    const jsonString = JSON.stringify(config, null, 2);
+    setJsonOutput(jsonString);
+    setShowJson(true);
+  };
+
+  const resetConfig = () => {
+    const defaultConfig: JsonConfig = {
+      version: '1.0',
+      name: '',
+      angles: [],
+      patterns: [], // Changed from 'pattern' to 'patterns'
+      repeat: 1,
+      tail: 0,
+      txStartDel: -1,
+      startUs: 20,
+      endUs: 22,
+    };
+    setConfig(defaultConfig);
+    setJsonOutput('');
+    setShowJson(false);
+    setErrors([]);
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(jsonOutput);
+      alert('Configuration copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
+  };
+
+  return (
+    <div className="control-panel">
+      <div className="rongbuk-header">
+        <h2 className="rongbuk-title">Scan Configuration</h2>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="rongbuk-refresh-btn" onClick={resetConfig}>
+            Reset
+          </button>
+          <button
+            className="rongbuk-refresh-btn"
+            onClick={generateConfig}
+            disabled={errors.length > 0}
+          >
+            Generate JSON
+          </button>
+        </div>
+      </div>
+
+      {/* Error Display */}
+      {errors.length > 0 && (
+        <div
+          style={{
+            marginBottom: '20px',
+            padding: '10px',
+            backgroundColor: '#f8d7da',
+            border: '1px solid #f5c6cb',
+            borderRadius: '4px',
+            color: '#721c24',
+          }}
+        >
+          <strong>Validation Errors:</strong>
+          <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+            {errors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="control-section">
+        {/* Basic Configuration */}
+        <div className="control-row">
+          <div className="control-group">
+            <label>Name:</label>
+            <input
+              type="text"
+              value={config.name}
+              onChange={e => updateConfig({ name: e.target.value })}
+              maxLength={31}
+              style={{
+                flex: 1,
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px',
+                minWidth: '200px',
+              }}
+              placeholder="Configuration name (max 31 chars)"
+            />
+          </div>
+
+          <div className="control-group">
+            <label>Repeat:</label>
+            <input
+              type="number"
+              value={config.repeat}
+              onChange={e =>
+                updateConfig({ repeat: parseInt(e.target.value) || 0 })
+              }
+              min={0}
+              max={31}
+              style={{
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px',
+                width: '80px',
+              }}
+            />
+          </div>
+
+          <div className="control-group">
+            <label>Tail:</label>
+            <input
+              type="number"
+              value={config.tail}
+              onChange={e =>
+                updateConfig({ tail: parseInt(e.target.value) || 0 })
+              }
+              min={0}
+              max={31}
+              style={{
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px',
+                width: '80px',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Timing Configuration */}
+        <div className="control-row">
+          <div className="control-group">
+            <label>Start Time (μs):</label>
+            <input
+              type="number"
+              value={config.startUs}
+              onChange={e => {
+                const val = parseInt(e.target.value) || 20;
+                const evenVal = val % 2 === 0 ? val : val + 1;
+                updateConfig({ startUs: Math.max(20, Math.min(198, evenVal)) });
+              }}
+              min={20}
+              max={198}
+              step={2}
+              style={{
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px',
+                width: '100px',
+              }}
+            />
+          </div>
+
+          <div className="control-group">
+            <label>End Time (μs):</label>
+            <input
+              type="number"
+              value={config.endUs}
+              onChange={e => {
+                const val = parseInt(e.target.value) || 22;
+                const evenVal = val % 2 === 0 ? val : val + 1;
+                updateConfig({ endUs: Math.max(22, Math.min(200, evenVal)) });
+              }}
+              min={22}
+              max={200}
+              step={2}
+              style={{
+                padding: '8px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '14px',
+                width: '100px',
+              }}
+            />
+          </div>
+
+          <div className="control-group">
+            <label>TX Start Delay:</label>
+            <select
+              value={config.txStartDel}
+              onChange={e =>
+                updateConfig({ txStartDel: parseInt(e.target.value) })
+              }
+              disabled
+            >
+              <option value={-1}>-1 (Fixed)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Angles Management */}
+      <div
+        style={{
+          marginTop: '20px',
+          padding: '15px',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+        }}
+      >
+        <div className="rongbuk-header">
+          <h3 style={{ margin: '0', fontSize: '16px' }}>
+            Angles ({config.angles.length}/91)
+          </h3>
+          <button
+            className="rongbuk-refresh-btn"
+            onClick={generateAngleRange}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
+          >
+            Generate Range (-45° to +45°, step 5°)
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            marginTop: '10px',
+          }}
+        >
+          <label>Degree:</label>
+          <input
+            type="number"
+            value={newAngleDegree}
+            onChange={e => setNewAngleDegree(e.target.value)}
+            min={-45}
+            max={45}
+            style={{
+              padding: '6px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              width: '80px',
+            }}
+          />
+          <button
+            className="rongbuk-refresh-btn"
+            onClick={addAngle}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
+          >
+            Add Angle
+          </button>
+        </div>
+
+        <div
+          style={{
+            marginTop: '10px',
+            maxHeight: '150px',
+            overflowY: 'auto',
+            border: '1px solid #eee',
+            borderRadius: '4px',
+          }}
+        >
+          {config.angles.length === 0 ? (
+            <div
+              style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: '#666',
+                fontStyle: 'italic',
+              }}
+            >
+              No angles defined
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                gap: '5px',
+                padding: '10px',
+              }}
+            >
+              {config.angles.map((angle, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span>{angle.degree}°</span>
+                  <button
+                    onClick={() => removeAngle(index)}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Patterns Management */}
+      <div
+        style={{
+          marginTop: '20px',
+          padding: '15px',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+        }}
+      >
+        <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+          Patterns ({config.patterns.length}/16)
+        </h3>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            marginBottom: '10px',
+          }}
+        >
+          <label>Duration:</label>
+          <input
+            type="number"
+            value={newPatternDuration}
+            onChange={e => setNewPatternDuration(parseInt(e.target.value) || 1)}
+            min={1}
+            max={31}
+            style={{
+              padding: '6px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              width: '80px',
+            }}
+          />
+          <label>Level:</label>
+          <select
+            value={newPatternLevel}
+            onChange={e => {
+              const value = e.target.value;
+              if (
+                value === 'F' ||
+                value === 'M' ||
+                value === 'P' ||
+                value === 'G'
+              ) {
+                setNewPatternLevel(value);
+              }
+            }}
+            style={{
+              padding: '6px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+            }}
+          >
+            <option value="F">F (Float)</option>
+            <option value="M">M (Minus)</option>
+            <option value="P">P (Positive)</option>
+            <option value="G">G (Ground)</option>
+          </select>
+          <button
+            className="rongbuk-refresh-btn"
+            onClick={addPattern}
+            style={{ fontSize: '12px', padding: '6px 12px' }}
+          >
+            Add Pattern
+          </button>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid #eee',
+            borderRadius: '4px',
+            maxHeight: '120px',
+            overflowY: 'auto',
+          }}
+        >
+          {config.patterns.length === 0 ? (
+            <div
+              style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: '#666',
+                fontStyle: 'italic',
+              }}
+            >
+              No patterns defined
+            </div>
+          ) : (
+            config.patterns.map((pattern, index) => (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  borderBottom:
+                    index < config.patterns.length - 1
+                      ? '1px solid #eee'
+                      : 'none',
+                  fontSize: '14px',
+                }}
+              >
+                <span>
+                  Duration: {pattern[0]} clocks, Level:{' '}
+                  {levelDisplayMap[pattern[1]]}
+                </span>
+                <button
+                  onClick={() => removePattern(index)}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* JSON Output Section */}
+      {showJson && (
+        <div
+          style={{
+            marginTop: '20px',
+            padding: '15px',
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            backgroundColor: '#f8f9fa',
+          }}
+        >
+          <div className="rongbuk-header">
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+              Configuration JSON
+            </h3>
+            <button
+              className="rongbuk-refresh-btn"
+              onClick={copyToClipboard}
+              style={{ fontSize: '12px', padding: '6px 12px' }}
+            >
+              Copy
+            </button>
+          </div>
+          <pre
+            style={{
+              backgroundColor: '#fff',
+              padding: '15px',
+              borderRadius: '4px',
+              border: '1px solid #eee',
+              fontSize: '12px',
+              overflow: 'auto',
+              maxHeight: '300px',
+              margin: 0,
+            }}
+          >
+            {jsonOutput}
+          </pre>
+        </div>
+      )}
+
+      {/* Status indicator */}
+      <div
+        style={{
+          marginTop: '15px',
+          padding: '10px',
+          fontSize: '14px',
+          color: '#666',
+          backgroundColor: '#f9f9f9',
+          borderRadius: '4px',
+          border: '1px solid #eee',
+        }}
+      >
+        <strong>Status:</strong> {config.angles.length} angles,{' '}
+        {config.patterns.length} patterns, Range: {config.startUs}μs -{' '}
+        {config.endUs}μs
+        {errors.length > 0 && (
+          <span style={{ color: '#dc3545', marginLeft: '10px' }}>
+            ⚠ {errors.length} error(s)
+          </span>
+        )}
+      </div>
+
+      <div className="control-group">
+        <label>
+          Time Range: {config.startUs}μs - {config.endUs}μs
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span>Start</span>
+          <input type="range" /* start slider config */ />
+          <span>End</span>
+          <input type="range" /* end slider config */ />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UltrasonicControlPanel;

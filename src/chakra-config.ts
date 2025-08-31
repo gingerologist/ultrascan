@@ -1,14 +1,3 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import {
-  ChakraProvider,
-  Container,
-  createSystem,
-  defaultConfig,
-  defineConfig,
-} from '@chakra-ui/react';
-import UltraSonicScannerApp from './UltraSonicScannerApp';
-
 const config = defineConfig({
   theme: {
     tokens: {
@@ -69,27 +58,4 @@ const config = defineConfig({
   },
 });
 
-const system = createSystem(defaultConfig, config);
-
-// // Log the entire system structure
-// console.log('System:', system);
-
-// // Look at available tokens
-// console.log('Color tokens:', system.tokens?.colors);
-// console.log('Semantic tokens:', system.semanticTokens?.colors);
-
-// // Check component recipes/variants
-// console.log('Button recipe:', system.recipes?.button);
-// console.log('All recipes:', system.recipes);
-
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(
-    <ChakraProvider value={system}>
-      <Container maxW="1200px" p={5}>
-        <UltraSonicScannerApp />
-      </Container>
-    </ChakraProvider>
-  );
-}
+export default config;

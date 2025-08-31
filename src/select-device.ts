@@ -12,6 +12,10 @@ declare const MODAL_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 let devicesWindow: BrowserWindow | null = null;
 
+const getDevicesWindow = (): BrowserWindow | null => {
+  return devicesWindow;
+};
+
 /**
  * create devices window in insecure mode
  */
@@ -19,9 +23,11 @@ const SelectDevice = (
   parent: BrowserWindow,
   callback: SelectDeviceCallback
 ): void => {
+  console.log(parent);
+
   devicesWindow = new BrowserWindow({
     parent,
-    modal: true,
+    modal: false,
     show: false,
     width: 600,
     height: 400,
@@ -56,7 +62,7 @@ const SelectDevice = (
         name,
         location,
       };
-      devicesWindow?.webContents.send('select-device-candidate', device);
+      devicesWindow?.webContents.send('device-discovered', device);
     });
 
     SerialPort.list()
@@ -75,7 +81,7 @@ const SelectDevice = (
           };
 
           // Send to devices window
-          devicesWindow?.webContents.send('select-device-candidate', device);
+          devicesWindow?.webContents.send('device-discovered', device);
         });
       })
       .catch(e => console.log('SerialPort.list()', e));
@@ -86,15 +92,19 @@ const SelectDevice = (
   const selectDeviceListener = (event: IpcMainEvent, ...args: any[]) => {
     console.log('selectDeviceListener args:', args);
     selected = args[0];
-    devicesWindow.close();
+
+    // TODO: this is for debugging, not used any more.
+    // devicesWindow.close();
+    const win = getDevicesWindow();
+    win.close();
   };
 
-  ipcMain.on('select-device', selectDeviceListener);
+  ipcMain.on('user-select-device', selectDeviceListener);
 
   devicesWindow.on('closed', () => {
     console.log('device window closed');
     devicesWindow = null;
-    ipcMain.off('select-device', selectDeviceListener);
+    ipcMain.off('user-select-device', selectDeviceListener);
     callback(null, selected);
   });
 };

@@ -6,14 +6,13 @@ import {
   ipcMain,
   IpcMainEvent,
   dialog,
+  webContents,
 } from 'electron';
 
 import * as net from 'net';
 import { SerialPort } from 'serialport';
 
 import type { ConnectionState, RongbukDevice } from './types/devices';
-
-import SelectDevice, { SelectDeviceCallback } from './select-device';
 
 import {
   UltrasonicDataParser,
@@ -23,6 +22,7 @@ import {
 } from './parser';
 
 import { error } from 'console';
+import discoverDevices from './discover-devices';
 
 const parser = new UltrasonicDataParser();
 
@@ -100,28 +100,27 @@ if (require('electron-squirrel-startup')) {
 
 let mainWindow: BrowserWindow | null = null;
 let currentDevice: RongbukDevice | null = null;
+let currentSocket: net.Socket | null = null;
+let currentPort: SerialPort | null = null;
 
-let connectedSerialDevice = null;
-let connectedNetworkDevice = null;
+const handleConnectDevice = (device: RongbukDevice | null) => {
+  if (device === null) return;
 
-const handleSelectDevice: SelectDeviceCallback = (error, device) => {
-  if (error) {
-    console.log(error);
+  if (currentDevice !== null && currentDevice.connectionState === 'CONNECTED') {
+    mainWindow?.webContents.send('device-update', currentDevice);
     return;
   }
 
-  if (device === null) return;
-
   if (typeof device.location == 'string') {
     // com port
-    const port = new SerialPort({
+    currentPort = new SerialPort({
       path: device.location,
       baudRate: 115200,
     });
-    port.on('open', () => {});
-    port.on('data', data => {});
-    port.on('close', () => {});
-    port.on('error', err => {}); // there is .isOpen to differentiate
+    currentPort.on('open', () => {});
+    currentPort.on('data', data => {});
+    currentPort.on('close', () => {});
+    currentPort.on('error', err => {}); // there is .isOpen to differentiate
   } else {
     currentDevice = device;
     currentDevice.connectionState = 'DISCONNECTED';
@@ -129,16 +128,18 @@ const handleSelectDevice: SelectDeviceCallback = (error, device) => {
     let received: number = 0;
     let timer: NodeJS.Timeout | null = null;
 
-    const client = net.createConnection(7332, device.location[0]);
+    currentSocket = net.createConnection(7332, device.location[0]);
 
-    client.on('connect', () => {
+    currentSocket.on('connect', () => {
       console.log(`connected to ${device.location[0]}`);
       currentDevice.connectionState = 'CONNECTED';
+      mainWindow?.webContents.send('device-update', currentDevice);
+
       parser.reset();
       // TODO: register disconnect function
     });
 
-    client.on('data', data => {
+    currentSocket.on('data', data => {
       parser.processData(new Uint8Array(data));
       received += data.length;
 
@@ -151,16 +152,19 @@ const handleSelectDevice: SelectDeviceCallback = (error, device) => {
       }, 5000);
     });
 
-    client.on('close', () => {
+    currentSocket.on('close', () => {
       console.log('tcp connection closed');
       currentDevice.connectionState = 'DISCONNECTED';
+      currentSocket = null;
+      mainWindow?.webContents.send('device-update', currentDevice);
     });
 
-    client.on('error', err => {
+    currentSocket.on('error', err => {
       console.log('tcp connection error', err);
       if (currentDevice.connectionState === 'CONNECTED') {
-        client.destroy(); // close will follow soon.
+        currentSocket.destroy(); // close will follow soon.
       } else {
+        currentSocket = null;
         dialog.showErrorBox(
           'Error',
           `Failed to establish a connection to ${device.name} at ${device.location}`
@@ -168,6 +172,13 @@ const handleSelectDevice: SelectDeviceCallback = (error, device) => {
       }
     });
   }
+};
+
+const handleDisconnectDevice = (device: RongbukDevice): void => {
+  if (device.name !== currentDevice.name) return;
+  if (currentDevice.connectionState === 'DISCONNECTED') return;
+  if (currentSocket === null) return;
+  currentSocket.destroy();
 };
 
 const MENUID_SELECTDEVICE = 'SelectDevice';
@@ -186,30 +197,6 @@ const updateMenuSelectDevice = (enabled: boolean): void => {
  * create main window, with extra menucommand
  */
 const createMainWindow = (): void => {
-  const insertMenuCommand = (): void => {
-    const currentMenu = Menu.getApplicationMenu();
-    if (currentMenu) {
-      const fileMenu = currentMenu.items.find(item => item.label === 'File');
-
-      if (fileMenu) {
-        fileMenu.submenu?.insert(0, new MenuItem({ type: 'separator' }));
-        fileMenu.submenu?.insert(
-          0,
-          new MenuItem({
-            id: MENUID_SELECTDEVICE,
-            label: 'Select Device',
-            enabled: true,
-            click: () =>
-              mainWindow !== null &&
-              SelectDevice(mainWindow, handleSelectDevice),
-          })
-        );
-
-        Menu.setApplicationMenu(currentMenu);
-      }
-    }
-  };
-
   mainWindow = new BrowserWindow({
     height: 600,
     width: 800,
@@ -221,11 +208,38 @@ const createMainWindow = (): void => {
   });
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-  insertMenuCommand();
   // mainWindow.webContents.openDevTools();
 
+  ipcMain.on('user-refresh-devices', () => {
+    discoverDevices(device => {
+      if (currentDevice !== null) {
+        if (currentDevice.name === device.name) {
+          device.connectionState = currentDevice.connectionState;
+        }
+      }
+      mainWindow?.webContents.send('device-update', device);
+    });
+  });
+
+  ipcMain.on(
+    'user-connect-device',
+    (event: IpcMainEvent, device: RongbukDevice) => {
+      console.log('user-connect-device:', device);
+      handleConnectDevice(device);
+    }
+  );
+
+  ipcMain.on(
+    'user-disconnect-device',
+    (event: IpcMainEvent, device: RongbukDevice) => {
+      console.log('user-disconnect-device:', device);
+      handleDisconnectDevice(device);
+    }
+  );
+
   // don't delete the following settings, though not used now.
-  // Handle Web Serial API
+  // these function handles Web Serial API permission check
+  // and is hard to make it work.
   mainWindow.webContents.session.on(
     'select-serial-port',
     (event, portList, webContents, callback) => {
@@ -270,3 +284,5 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+const refreshDevices = (): void => {};

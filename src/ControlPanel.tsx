@@ -1,36 +1,36 @@
 import React, { useState, useCallback } from 'react';
 import {
   Box,
+  Paper,
+  Typography,
   Button,
-  Flex,
-  Heading,
-  Input,
-  Select,
-  Text,
-  VStack,
-  HStack,
+  Stack,
   Grid,
-  GridItem,
-  NumberInput,
-  // NumberInputField,
+  FormControl,
+  FormLabel,
+  TextField,
+  Select,
+  MenuItem,
   Slider,
-  // SliderTrack,
-  // SliderFilledTrack,
-  // SliderThumb,
-  // RangeSlider,
-  // RangeSliderTrack,
-  // RangeSliderFilledTrack,
-  // RangeSliderThumb,
   Alert,
-  // AlertIcon,
-  AlertDescription,
-  Code,
-  SegmentGroup,
-} from '@chakra-ui/react';
-
-import { FormControl, FormLabel } from '@chakra-ui/form-control';
-
-/** */
+  AlertTitle,
+  Chip,
+  Divider,
+  IconButton,
+  Card,
+  CardContent,
+  useTheme,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
+} from '@mui/material';
+import {
+  Delete as DeleteIcon,
+  ContentCopy as CopyIcon,
+  Add as AddIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
 
 // Type definitions matching your schema
 interface JsonAngle {
@@ -62,13 +62,15 @@ const seg32: string[] = new Array(32).fill(0).map((x, i) => i.toString());
 const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   onConfigChange,
 }) => {
+  const theme = useTheme();
+
   const [config, setConfig] = useState<JsonConfig>({
     version: '1.0',
     name: '',
     angles: [],
     patterns: [],
     repeat: 1,
-    tail: 0,
+    tail: 2,
     txStartDel: -1,
     startUs: 20,
     endUs: 22,
@@ -76,16 +78,18 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
 
   const [jsonOutput, setJsonOutput] = useState('');
   const [showJson, setShowJson] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [patternError, setPatternError] = useState<string>('');
 
-  // Pattern management
-  const [newPatternDuration, setNewPatternDuration] = useState(1);
-  const [newPatternLevel, setNewPatternLevel] = useState<CharPatternLevel>('F');
+  // Pattern management - simplified to just text input
+  const [patternText, setPatternText] = useState('');
 
-  // Angle management (dummy for now)
-  const [newAngleDegree, setNewAngleDegree] = useState('0');
+  // Angle management - new approach with range slider and divisor
+  const [angleRange, setAngleRange] = useState<[number, number]>([0, 0]);
+  const [selectedDivisor, setSelectedDivisor] = useState(2);
+  const [availableDivisors, setAvailableDivisors] = useState<number[]>([]);
 
-  // const toast = useToast(); TODO: new toaster?
+  // Steps control
+  const [steps, setSteps] = useState(1);
 
   const levelMap: Record<CharPatternLevel, number> = {
     F: 0, // Float
@@ -106,125 +110,102 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     return new Array(32).fill(0);
   };
 
-  // Validate configuration
-  const validateConfig = useCallback((configToValidate: JsonConfig) => {
-    const newErrors: string[] = [];
-
-    // Check angles uniqueness
-    const degrees = configToValidate.angles.map(a => a.degree);
-    const uniqueDegrees = [...new Set(degrees)];
-    if (degrees.length !== uniqueDegrees.length) {
-      newErrors.push('All angle degrees must be unique');
-    }
-
-    // Check endUs > startUs
-    if (configToValidate.endUs <= configToValidate.startUs) {
-      newErrors.push('End time must be greater than start time');
-    }
-
-    // Check required arrays
-    if (configToValidate.angles.length === 0) {
-      newErrors.push('At least one angle is required');
-    }
-
-    if (configToValidate.patterns.length === 0) {
-      newErrors.push('At least one pattern is required');
-    }
-
-    setErrors(newErrors);
-    return newErrors.length === 0;
-  }, []);
-
   const updateConfig = useCallback(
     (updates: Partial<JsonConfig>) => {
       const newConfig = { ...config, ...updates };
       setConfig(newConfig);
-      validateConfig(newConfig);
 
       if (onConfigChange) {
         onConfigChange(newConfig);
       }
     },
-    [config, onConfigChange, validateConfig]
+    [config, onConfigChange]
   );
 
-  // Pattern management functions
-  const addPattern = () => {
-    const duration = newPatternDuration;
-    const level = levelMap[newPatternLevel];
+  // Calculate divisors for a given range
+  const calculateDivisors = (range: number): number[] => {
+    if (range === 0) return [];
 
-    if (duration < 1 || duration > 31) {
-      // toast({
-      //   title: 'Invalid Duration',
-      //   description: 'Duration must be between 1 and 31 clocks',
-      //   status: 'error',
-      //   duration: 3000,
-      // });
-      return;
+    const divisors: number[] = [];
+    for (let i = 2; i <= range; i++) {
+      if (range % i === 0) {
+        divisors.push(i);
+      }
     }
-
-    if (config.patterns.length >= 16) {
-      // toast({
-      //   title: 'Maximum Patterns Reached',
-      //   description: 'Maximum 16 patterns allowed',
-      //   status: 'error',
-      //   duration: 3000,
-      // });
-      return;
-    }
-
-    const newPattern: JsonPatternSegment = [duration, level];
-    updateConfig({
-      patterns: [...config.patterns, newPattern],
-    });
-    setNewPatternDuration(1);
-    setNewPatternLevel('F');
+    return divisors;
   };
 
-  const removePattern = (index: number) => {
-    const newPatterns = config.patterns.filter((_, i) => i !== index);
-    updateConfig({ patterns: newPatterns });
-  };
+  // Handle angle range change with symmetric behavior
+  const handleAngleRangeChange = (
+    event: Event,
+    newValue: number | number[]
+  ) => {
+    const [newStart, newEnd] = newValue as [number, number];
 
-  // Dummy angle functions
-  const addAngle = () => {
-    const degree = parseInt(newAngleDegree);
-    if (degree < -45 || degree > 45) {
-      // toast({
-      //   title: 'Invalid Degree',
-      //   description: 'Degree must be between -45 and 45',
-      //   status: 'error',
-      //   duration: 3000,
-      // });
-      return;
+    // Determine which thumb moved by comparing with current values
+    const [currentStart, currentEnd] = angleRange;
+
+    let symmetricRange: [number, number];
+
+    if (newStart !== currentStart) {
+      // Left thumb moved, mirror it to the right
+      symmetricRange = [newStart, -newStart];
+    } else if (newEnd !== currentEnd) {
+      // Right thumb moved, mirror it to the left
+      symmetricRange = [-newEnd, newEnd];
+    } else {
+      // No change or both changed somehow
+      symmetricRange = [newStart, newEnd];
     }
 
-    const newAngle = {
-      degree: degree,
-      masks: generateDefaultMask(),
-    };
+    // Ensure the range is valid (start <= end)
+    if (symmetricRange[0] > symmetricRange[1]) {
+      symmetricRange = [symmetricRange[1], symmetricRange[0]];
+    }
 
-    updateConfig({
-      angles: [...config.angles, newAngle],
-    });
-    setNewAngleDegree('0');
+    setAngleRange(symmetricRange);
+
+    // Calculate new divisors
+    const range = Math.abs(symmetricRange[1] - symmetricRange[0]);
+    const divisors = calculateDivisors(range);
+    setAvailableDivisors(divisors);
+
+    // Reset divisor to 2 if available, otherwise first available divisor
+    if (divisors.length > 0) {
+      setSelectedDivisor(divisors.includes(2) ? 2 : divisors[0]);
+    }
   };
 
-  const removeAngle = (index: number) => {
-    const newAngles = config.angles.filter((_, i) => i !== index);
-    updateConfig({ angles: newAngles });
+  // Handle window range change with even number constraint
+  const handleWindowRangeChange = (
+    event: Event,
+    newValue: number | number[]
+  ) => {
+    let [newStart, newEnd] = newValue as [number, number];
+
+    // Ensure even numbers
+    newStart = newStart % 2 === 0 ? newStart : newStart + 1;
+    newEnd = newEnd % 2 === 0 ? newEnd : newEnd + 1;
+
+    // Ensure endUs > startUs by at least 2
+    if (newEnd <= newStart) {
+      newEnd = newStart + 2;
+    }
+
+    // Ensure within bounds
+    newStart = Math.max(20, Math.min(198, newStart));
+    newEnd = Math.max(newStart + 2, Math.min(200, newEnd));
+
+    updateConfig({ startUs: newStart, endUs: newEnd });
   };
 
   const generateConfig = () => {
-    if (!validateConfig(config)) {
-      // toast({
-      //   title: 'Validation Failed',
-      //   description: 'Please fix the errors before generating JSON',
-      //   status: 'error',
-      //   duration: 3000,
-      // });
+    // Basic pattern validation
+    if (!patternText.trim()) {
+      setPatternError('Pattern text is required');
       return;
     }
+    setPatternError('');
 
     const jsonString = JSON.stringify(config, null, 2);
     setJsonOutput(jsonString);
@@ -238,7 +219,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
       angles: [],
       patterns: [],
       repeat: 1,
-      tail: 0,
+      tail: 2,
       txStartDel: -1,
       startUs: 20,
       endUs: 22,
@@ -246,406 +227,328 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     setConfig(defaultConfig);
     setJsonOutput('');
     setShowJson(false);
-    setErrors([]);
+    setPatternError('');
+    setPatternText('');
+    setAngleRange([0, 0]);
+    setSelectedDivisor(2);
+    setAvailableDivisors([]);
+    setSteps(1);
   };
 
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(jsonOutput);
-      // toast({
-      //   title: 'Copied!',
-      //   description: 'Configuration copied to clipboard',
-      //   status: 'success',
-      //   duration: 2000,
-      // });
+      // TODO: Add toast notification
     } catch (err) {
-      // toast({
-      //   title: 'Copy Failed',
-      //   description: 'Could not copy to clipboard',
-      //   status: 'error',
-      //   duration: 3000,
-      // });
+      // TODO: Add toast notification
     }
   };
 
   return (
-    <Box
-      bg="white"
-      border="2px solid"
-      borderColor="gray.200"
-      borderRadius="lg"
-      p={6}
-      mb={8}
+    <Paper
+      elevation={2}
+      sx={{
+        p: 3,
+        mb: 4,
+        border: '2px solid',
+        borderColor: 'grey.200',
+      }}
     >
       {/* Header */}
-      <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="md" color="gray.700">
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
+        <Typography variant="h5" color="text.secondary" fontWeight="medium">
           Scan Configuration
-        </Heading>
-        <HStack gap={3}>
-          <Button colorScheme="gray" onClick={resetConfig}>
+        </Typography>
+        <Stack direction="row" spacing={2}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={resetConfig}
+          >
             Reset
           </Button>
-          <Button
-            colorScheme="blue"
-            onClick={generateConfig}
-            disabled={errors.length > 0}
-          >
+          <Button variant="contained" onClick={generateConfig}>
             Generate JSON
           </Button>
-        </HStack>
-      </Flex>
+        </Stack>
+      </Box>
 
-      {/* Error Display */}
-      {/* {errors.length > 0 && (
-        <Alert status="error" mb={4}> TODO:
-          <AlertIcon />
-          <Box>
-            <AlertDescription>
-              <Text fontWeight="bold">Validation Errors:</Text>
-              {errors.map((error, index) => (
-                <Text key={index} fontSize="sm">
-                  • {error}
-                </Text>
-              ))}
-            </AlertDescription>
-          </Box>
-        </Alert>
-      )} */}
-
-      <VStack gap={6} align="stretch">
-        {/* Angles Section (Dummy) */}
-        <Box border="1px solid" borderColor="gray.200" borderRadius="lg" p={4}>
-          <Flex justify="space-between" align="center" mb={4}>
-            <Heading size="sm" color="gray.600">
-              Angles ({config.angles.length}/91)
-            </Heading>
-            <Button size="sm" colorScheme="blue" variant="outline">
-              Generate Range
-            </Button>
-          </Flex>
-
-          <HStack mb={4} gap={4}>
-            <FormControl maxW="100px">
-              <FormLabel fontSize="sm">Degree:</FormLabel>
-              {/* <NumberInput TODO:
-                value={newAngleDegree}
-                onChange={setNewAngleDegree}
+      {/* Compact Form Layout */}
+      <Table sx={{ '& td': { border: 0, py: 1.5 } }}>
+        <TableBody>
+          {/* Angles Row */}
+          <TableRow>
+            <TableCell sx={{ width: '20%', verticalAlign: 'top', pr: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight="medium"
+              >
+                Angles
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {angleRange[0] === angleRange[1]
+                  ? `Single: ${angleRange[0]}°`
+                  : `${angleRange[0]}° to ${angleRange[1]}°`}
+              </Typography>
+            </TableCell>
+            <TableCell sx={{ width: '50%' }}>
+              <Slider
+                value={angleRange}
+                onChange={handleAngleRangeChange}
                 min={-45}
                 max={45}
+                step={1}
+                marks={[
+                  { value: -45, label: '-45°' },
+                  { value: 0, label: '0°' },
+                  { value: 45, label: '45°' },
+                ]}
+                valueLabelDisplay="auto"
+                valueLabelFormat={value => `${value}°`}
+                size="small"
+              />
+            </TableCell>
+            <TableCell sx={{ width: '30%', pl: 2 }}>
+              <Select
+                value={selectedDivisor}
+                onChange={e => setSelectedDivisor(e.target.value as number)}
+                size="small"
+                disabled={availableDivisors.length === 0}
+                sx={{ minWidth: 120 }}
+                displayEmpty
               >
-                <NumberInputField />
-              </NumberInput> */}
-            </FormControl>
-            <Button
-              size="sm"
-              colorScheme="blue"
-              onClick={addAngle}
-              alignSelf="end"
-            >
-              Add Angle
-            </Button>
-          </HStack>
+                {availableDivisors.length === 0 ? (
+                  <MenuItem value={2} disabled>
+                    No divisions
+                  </MenuItem>
+                ) : (
+                  availableDivisors.map(divisor => (
+                    <MenuItem key={divisor} value={divisor}>
+                      {divisor} parts
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </TableCell>
+          </TableRow>
 
-          {config.angles.length === 0 ? (
-            <Text color="gray.500" fontStyle="italic" textAlign="center" py={4}>
-              No angles defined
-            </Text>
-          ) : (
-            <Grid
-              templateColumns="repeat(auto-fill, minmax(100px, 1fr))"
-              gap={2}
-            >
-              {config.angles.map((angle, index) => (
-                <GridItem key={index}>
-                  <HStack
-                    p={2}
-                    border="1px solid"
-                    borderColor="gray.200"
-                    borderRadius="md"
-                    fontSize="sm"
-                  >
-                    <Text>{angle.degree}°</Text>
-                    <Button
-                      size="xs"
-                      colorScheme="red"
-                      onClick={() => removeAngle(index)}
-                    >
-                      ×
-                    </Button>
-                  </HStack>
-                </GridItem>
-              ))}
-            </Grid>
-          )}
-        </Box>
+          {/* Steps Row */}
+          <TableRow>
+            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight="medium"
+              >
+                Steps
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {steps}
+              </Typography>
+            </TableCell>
+            <TableCell colSpan={2}>
+              <Slider
+                value={steps}
+                onChange={(_, value) => setSteps(value as number)}
+                min={1}
+                max={32}
+                step={1}
+                marks={[
+                  { value: 1, label: '1' },
+                  { value: 32, label: '32' },
+                ]}
+                valueLabelDisplay="auto"
+                size="small"
+              />
+            </TableCell>
+          </TableRow>
 
-        {/* Patterns Section */}
-        <Box border="1px solid" borderColor="gray.200" borderRadius="lg" p={4}>
-          <Heading size="sm" color="gray.600" mb={4}>
-            Patterns ({config.patterns.length}/16)
-          </Heading>
+          {/* Pattern Row */}
+          <TableRow>
+            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight="medium"
+              >
+                Pattern
+              </Typography>
+              {patternError && (
+                <Typography variant="caption" color="error.main">
+                  {patternError}
+                </Typography>
+              )}
+            </TableCell>
+            <TableCell colSpan={2}>
+              <TextField
+                fullWidth
+                size="small"
+                value={patternText}
+                onChange={e => {
+                  setPatternText(e.target.value);
+                  if (patternError) setPatternError('');
+                }}
+                placeholder="Enter pattern text here..."
+                error={!!patternError}
+              />
+            </TableCell>
+          </TableRow>
 
-          <HStack mb={4} gap={4}>
-            <FormControl maxW="100px">
-              <FormLabel fontSize="sm">Duration:</FormLabel>
-              {/* <NumberInput TODO:
-                value={newPatternDuration}
-                onChange={(_, num) => setNewPatternDuration(num || 1)}
+          {/* Repeat Row */}
+          <TableRow>
+            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight="medium"
+              >
+                Repeat
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {config.repeat}
+              </Typography>
+            </TableCell>
+            <TableCell colSpan={2}>
+              <Slider
+                value={config.repeat}
+                onChange={(_, value) =>
+                  updateConfig({ repeat: value as number })
+                }
                 min={1}
                 max={31}
-              >
-                <NumberInputField />
-              </NumberInput> */}
-            </FormControl>
-            <FormControl maxW="150px">
-              <FormLabel fontSize="sm">Level:</FormLabel>
-              {/* <Select TODO:
-                value={newPatternLevel}
-                onChange={e =>
-                  setNewPatternLevel(e.target.value as CharPatternLevel)
-                }
-              >
-                <option value="F">F (Float)</option>
-                <option value="M">M (Minus)</option>
-                <option value="P">P (Positive)</option>
-                <option value="G">G (Ground)</option>
-              </Select> */}
-            </FormControl>
-            <Button
-              size="sm"
-              colorScheme="blue"
-              onClick={addPattern}
-              alignSelf="end"
-            >
-              Add Pattern
-            </Button>
-          </HStack>
-
-          {config.patterns.length === 0 ? (
-            <Text color="gray.500" fontStyle="italic" textAlign="center" py={4}>
-              No patterns defined
-            </Text>
-          ) : (
-            <VStack gap={2} align="stretch">
-              {config.patterns.map((pattern, index) => (
-                <Flex
-                  key={index}
-                  justify="space-between"
-                  align="center"
-                  p={3}
-                  border="1px solid"
-                  borderColor="gray.100"
-                  borderRadius="md"
-                  fontSize="sm"
-                >
-                  <Text>
-                    Duration: {pattern[0]} clocks, Level:{' '}
-                    {levelDisplayMap[pattern[1]]}
-                  </Text>
-                  <Button
-                    size="xs"
-                    colorScheme="red"
-                    onClick={() => removePattern(index)}
-                  >
-                    Remove
-                  </Button>
-                </Flex>
-              ))}
-            </VStack>
-          )}
-        </Box>
-
-        {/* Repeat and Tail Section */}
-        <Box border="1px solid" borderColor="gray.200" borderRadius="lg" p={4}>
-          <Heading size="sm" color="gray.600" mb={4}>
-            Pattern Settings
-          </Heading>
-          <Grid templateColumns="1fr 1fr" gap={6}>
-            <FormControl>
-              <FormLabel>Repeat: {config.repeat}</FormLabel>
-              {/* <Slider TODO:
-                value={config.repeat}
-                // onChange={value => updateConfig({ repeat: value })}
-                onChange={() => {}}
-                min={0}
-                max={31}
                 step={1}
-                transition="none"
-              >
-                <SliderTrack>
-                  <SliderFilledTrack />
-                </SliderTrack>
-                <SliderThumb />
-              </Slider> */}
-              <Slider.Root defaultValue={[40]}>
-                <Slider.Control></Slider.Control>
-                <Slider.Track></Slider.Track>
-                <Slider.Range />
-                <Slider.Thumb>
-                  <Slider.DraggingIndicator />
-                </Slider.Thumb>
-              </Slider.Root>
-              <HStack
-                justify="space-between"
-                fontSize="xs"
-                color="gray.500"
-                mt={1}
-              >
-                <Text>1</Text>
-                <Text>31</Text>
-              </HStack>
-            </FormControl>
+                marks={[
+                  { value: 1, label: '1' },
+                  { value: 31, label: '31' },
+                ]}
+                valueLabelDisplay="auto"
+                size="small"
+              />
+            </TableCell>
+          </TableRow>
 
-            <FormControl>
-              <FormLabel>Tail: {config.tail}</FormLabel>
-              {/* <Slider TODO:
+          {/* Tail Row */}
+          <TableRow>
+            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight="medium"
+              >
+                Tail
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {config.tail}
+              </Typography>
+            </TableCell>
+            <TableCell colSpan={2}>
+              <Slider
                 value={config.tail}
-                onChange={value => updateConfig({ tail: value })}
-                min={0}
-                max={31}
+                onChange={(_, value) => updateConfig({ tail: value as number })}
+                min={2}
+                max={32}
                 step={1}
+                marks={[
+                  { value: 2, label: '2' },
+                  { value: 32, label: '32' },
+                ]}
+                valueLabelDisplay="auto"
+                size="small"
+              />
+            </TableCell>
+          </TableRow>
+
+          {/* Window Row */}
+          <TableRow>
+            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                fontWeight="medium"
               >
-                <SliderTrack>
-                  <SliderFilledTrack />
-                </SliderTrack>
-                <SliderThumb />
-              </Slider> */}
-              {/* <HStack
-                justify="space-between"
-                fontSize="xs"
-                color="gray.500"
-                mt={1}
-              >
-                <Text>0</Text>
-                <Text>31</Text>
-              </HStack> */}
+                Window
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {config.startUs}μs - {config.endUs}μs
+              </Typography>
+            </TableCell>
+            <TableCell colSpan={2}>
+              <Slider
+                value={[config.startUs, config.endUs]}
+                onChange={handleWindowRangeChange}
+                min={20}
+                max={200}
+                step={2}
+                marks={[
+                  { value: 20, label: '20μs' },
+                  { value: 200, label: '200μs' },
+                ]}
+                valueLabelDisplay="auto"
+                valueLabelFormat={value => `${value}μs`}
+                size="small"
+              />
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
 
-              <SegmentGroup.Root size="xs" defaultValue="5">
-                <SegmentGroup.Indicator />
-                <SegmentGroup.Items items={seg32} />
-              </SegmentGroup.Root>
-            </FormControl>
-          </Grid>
-        </Box>
-
-        {/* Time Range Section */}
-        <Box border="1px solid" borderColor="gray.200" borderRadius="lg" p={4}>
-          <Heading size="sm" color="gray.600" mb={4}>
-            Time Range: {config.startUs}μs - {config.endUs}μs
-          </Heading>
-          <FormControl>
-            {/* <RangeSlider TODO:
-              value={[config.startUs, config.endUs]}
-              onChange={([start, end]) => {
-                // Ensure even numbers and proper constraints
-                const evenStart = start % 2 === 0 ? start : start + 1;
-                const evenEnd = end % 2 === 0 ? end : end + 1;
-                const finalStart = Math.max(20, Math.min(198, evenStart));
-                const finalEnd = Math.max(
-                  finalStart + 2,
-                  Math.min(200, evenEnd)
-                );
-                updateConfig({ startUs: finalStart, endUs: finalEnd });
-              }}
-              min={20}
-              max={200}
-              step={2}
-            >
-              <RangeSliderTrack>
-                <RangeSliderFilledTrack />
-              </RangeSliderTrack>
-              <RangeSliderThumb index={0} />
-              <RangeSliderThumb index={1} />
-            </RangeSlider> */}
-            <Slider.Root
-              defaultValue={[40, 80]}
-              step={2}
-              minStepsBetweenThumbs={2}
-              min={20}
-              max={200}
-            >
-              <HStack justify={'space-between'}>
-                <Slider.Label>Scan Window</Slider.Label>
-                <Slider.ValueText />
-              </HStack>
-              <Slider.Control>
-                <Slider.Track>
-                  <Slider.Range />
-                </Slider.Track>
-                <Slider.Thumbs>
-                  <Slider.DraggingIndicator />
-                  <Slider.DraggingIndicator />
-                </Slider.Thumbs>
-                <Slider.Marks
-                  marks={[
-                    { value: 20, label: '20μs' },
-                    { value: 200, label: '200μs' },
-                  ]}
-                />
-              </Slider.Control>
-            </Slider.Root>
-          </FormControl>
-        </Box>
-
-        {/* JSON Output Section */}
-        {showJson && (
-          <Box
-            border="1px solid"
-            borderColor="gray.200"
-            borderRadius="lg"
-            p={4}
-            bg="gray.50"
+      {/* JSON Output Section */}
+      {showJson && (
+        <Box mt={3}>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              bgcolor: 'grey.50',
+            }}
           >
-            <Flex justify="space-between" align="center" mb={4}>
-              <Heading size="sm" color="gray.600">
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              mb={2}
+            >
+              <Typography variant="subtitle2" color="text.secondary">
                 Configuration JSON
-              </Heading>
-              <Button size="sm" colorScheme="blue" onClick={copyToClipboard}>
+              </Typography>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<CopyIcon />}
+                onClick={copyToClipboard}
+              >
                 Copy
               </Button>
-            </Flex>
-            <Code
-              display="block"
-              whiteSpace="pre"
-              p={4}
-              bg="white"
-              border="1px solid"
-              borderColor="gray.200"
-              borderRadius="md"
-              fontSize="xs"
-              overflowX="auto"
-              maxH="300px"
-              overflowY="auto"
+            </Box>
+            <Paper
+              sx={{
+                p: 2,
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'grey.300',
+                maxHeight: 300,
+                overflow: 'auto',
+              }}
             >
-              {jsonOutput}
-            </Code>
-          </Box>
-        )}
-
-        {/* Status indicator */}
-        <Box
-          p={3}
-          bg="gray.50"
-          borderRadius="md"
-          border="1px solid"
-          borderColor="gray.200"
-        >
-          <Text fontSize="sm" color="gray.600">
-            <Text as="span" fontWeight="bold">
-              Status:
-            </Text>{' '}
-            {config.angles.length} angles, {config.patterns.length} patterns,
-            Range: {config.startUs}μs - {config.endUs}μs
-            {errors.length > 0 && (
-              <Text as="span" color="red.500" ml={2}>
-                ⚠ {errors.length} error(s)
-              </Text>
-            )}
-          </Text>
+              <Typography
+                component="pre"
+                variant="body2"
+                fontFamily="monospace"
+                sx={{ whiteSpace: 'pre-wrap', margin: 0 }}
+              >
+                {jsonOutput}
+              </Typography>
+            </Paper>
+          </Paper>
         </Box>
-      </VStack>
-    </Box>
+      )}
+    </Paper>
   );
 };
 

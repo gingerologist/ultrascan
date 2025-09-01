@@ -1,95 +1,99 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  ChakraProvider,
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
   Container,
-  createSystem,
-  defaultConfig,
-  defineConfig,
-} from '@chakra-ui/react';
+} from '@mui/material';
 import UltraSonicScannerApp from './UltraSonicScannerApp';
 
-const config = defineConfig({
-  theme: {
-    tokens: {
-      colors: {
-        blue: {
-          500: { value: '#3b82f6' },
-          600: { value: '#2563eb' },
-        },
-        gray: {
-          50: { value: '#f9fafb' },
-          100: { value: '#f3f4f6' },
-          200: { value: '#e5e7eb' },
-          600: { value: '#4b5563' },
-          700: { value: '#374151' },
-        },
-        red: { 500: { value: '#ef4444' } },
-        green: { 500: { value: '#10b981' } },
-        white: { value: '#ffffff' },
-      },
-    },
-    // Component recipes - this is what actually styles your components
-    recipes: {
-      button: {
-        base: {
-          px: '4',
-          py: '2',
-          borderRadius: 'md',
-          fontWeight: 'medium',
-          cursor: 'pointer',
-        },
-        variants: {
-          variant: {
-            solid: {
-              bg: 'blue.500',
-              color: 'white',
-              _hover: { bg: 'blue.600' },
-            },
-            outline: {
-              border: '1px solid',
-              borderColor: 'gray.200',
-              bg: 'white',
-              _hover: { bg: 'gray.50' },
-            },
-          },
-          colorScheme: {
-            blue: { bg: 'blue.500', _hover: { bg: 'blue.600' } },
-            red: { bg: 'red.500' },
-            green: { bg: 'green.500' },
-            gray: { bg: 'gray.600' },
-          },
-        },
-        defaultVariants: {
-          variant: 'solid',
-          colorScheme: 'blue',
-        },
-      },
-    },
-  },
-});
+// Create a custom MUI theme that matches your previous color scheme
+// const theme = createTheme({
+//   palette: {
+//     primary: {
+//       main: '#3b82f6', // blue.500
+//       dark: '#2563eb', // blue.600
+//     },
+//     secondary: {
+//       main: '#4b5563', // gray.600
+//     },
+//     error: {
+//       main: '#ef4444', // red.500
+//     },
+//     success: {
+//       main: '#10b981', // green.500
+//     },
+//     grey: {
+//       50: '#f9fafb',
+//       100: '#f3f4f6',
+//       200: '#e5e7eb',
+//       600: '#4b5563',
+//       700: '#374151',
+//     },
+//     background: {
+//       default: '#ffffff',
+//       paper: '#ffffff',
+//     },
+//   },
+//   components: {
+//     // Customize button component to match your previous styling
+//     MuiButton: {
+//       styleOverrides: {
+//         root: {
+//           textTransform: 'none', // Prevent uppercase transformation
+//           fontWeight: 500, // medium weight
+//           borderRadius: '6px', // md border radius
+//         },
+//       },
+//       variants: [
+//         {
+//           props: { variant: 'contained' },
+//           style: {
+//             backgroundColor: '#3b82f6',
+//             '&:hover': {
+//               backgroundColor: '#2563eb',
+//             },
+//           },
+//         },
+//         {
+//           props: { variant: 'outlined' },
+//           style: {
+//             borderColor: '#e5e7eb',
+//             backgroundColor: '#ffffff',
+//             '&:hover': {
+//               backgroundColor: '#f9fafb',
+//             },
+//           },
+//         },
+//       ],
+//     },
+//   },
+//   typography: {
+//     fontFamily: [
+//       '-apple-system',
+//       'BlinkMacSystemFont',
+//       '"Segoe UI"',
+//       'Roboto',
+//       '"Helvetica Neue"',
+//       'Arial',
+//       'sans-serif',
+//     ].join(','),
+//   },
+// });
 
-const system = createSystem(defaultConfig, config);
-
-// // Log the entire system structure
-// console.log('System:', system);
-
-// // Look at available tokens
-// console.log('Color tokens:', system.tokens?.colors);
-// console.log('Semantic tokens:', system.semanticTokens?.colors);
-
-// // Check component recipes/variants
-// console.log('Button recipe:', system.recipes?.button);
-// console.log('All recipes:', system.recipes);
-
+const theme = createTheme({});
 const container = document.getElementById('root');
+
 if (container) {
   const root = createRoot(container);
   root.render(
-    <ChakraProvider value={system}>
-      <Container maxW="1200px" p={5}>
+    <ThemeProvider theme={theme}>
+      {/* CssBaseline provides consistent CSS baseline across browsers */}
+      <CssBaseline />
+      <Container maxWidth="lg" sx={{ p: 5 }}>
         <UltraSonicScannerApp />
       </Container>
-    </ChakraProvider>
+    </ThemeProvider>
   );
 }

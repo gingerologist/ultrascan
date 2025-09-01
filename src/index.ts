@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   Menu,
   MenuItem,
+  MenuItemConstructorOptions,
   ipcMain,
   IpcMainEvent,
   dialog,
@@ -23,6 +24,12 @@ import {
 
 import { error } from 'console';
 import discoverDevices from './discover-devices';
+
+import {
+  createTestingWindow,
+  openTestingWindow,
+  addTestingMenuToMainWindow,
+} from './testing';
 
 const parser = new UltrasonicDataParser();
 
@@ -209,6 +216,40 @@ const createMainWindow = (): void => {
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
   // mainWindow.webContents.openDevTools();
+
+  // const menuTemplate: MenuItemConstructorOptions[] = [
+  //   { role: 'fileMenu' },
+  //   { role: 'editMenu' },
+  //   { role: 'viewMenu' },
+  //   {
+  //     label: 'Test',
+  //     submenu: [
+  //       {
+  //         label: 'foo',
+  //         click: () => {
+  //           dialog.showMessageBox(mainWindow, {
+  //             message: 'You clicked foo',
+  //             type: 'info',
+  //           });
+  //         },
+  //       },
+  //       {
+  //         label: 'bar',
+  //         click: () => {
+  //           dialog.showMessageBox(mainWindow, {
+  //             message: 'You clicked bar',
+  //             type: 'info',
+  //           });
+  //         },
+  //       },
+  //     ],
+  //   },
+  //   { role: 'windowMenu' },
+  // ];
+
+  // const menu = Menu.buildFromTemplate(menuTemplate);
+  // Menu.setApplicationMenu(menu);
+  addTestingMenuToMainWindow(mainWindow);
 
   ipcMain.on('user-refresh-devices', () => {
     discoverDevices(device => {

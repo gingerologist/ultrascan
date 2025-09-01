@@ -1,30 +1,25 @@
 import React, { useState } from 'react';
 import {
   Box,
+  Paper,
+  Typography,
   Button,
-  Flex,
-  Heading,
-  Text,
-  Spinner,
-  HStack,
-  VStack,
-} from '@chakra-ui/react';
-import { Table, Thead, Tbody, Tr, Th, Td } from '@chakra-ui/table';
-import { RepeatIcon } from '@chakra-ui/icons';
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Stack,
+  CircularProgress,
+} from '@mui/material';
+import {
+  Refresh as RefreshIcon,
+  Wifi as ConnectIcon,
+  WifiOff as DisconnectIcon,
+} from '@mui/icons-material';
 
 import type { RongbukDevice } from './types/devices';
-
-/*
-// Define the device type (adjust according to your actual type)
-interface RongbukDevice {
-  name: string;
-  location: string | string[];
-  connectionState:
-    | 'CONNECTED'
-    | 'CONNECTING'
-    | 'DISCONNECTING'
-    | 'DISCONNECTED';
-} */
 
 interface RongbukDevicesProps {
   devices: RongbukDevice[];
@@ -73,62 +68,105 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
     };
   };
 
+  const getConnectionColor = (state: RongbukDevice['connectionState']) => {
+    switch (state) {
+      case 'CONNECTED':
+        return 'success.main';
+      case 'CONNECTING':
+      case 'DISCONNECTING':
+        return 'warning.main';
+      case 'DISCONNECTED':
+      default:
+        return 'text.secondary';
+    }
+  };
+
   return (
-    <Box
-      bg="white"
-      border="2px solid"
-      borderColor="gray.200"
-      borderRadius="lg"
-      p={5}
-      mb={8}
+    <Paper
+      elevation={2}
+      sx={{
+        p: 3,
+        mb: 4,
+        border: '2px solid',
+        borderColor: 'grey.200',
+      }}
     >
       {/* Header */}
-      <Flex justify="space-between" align="center" mb={4}>
-        <Heading size="md" color="gray.700">
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
+        <Typography variant="h5" color="text.secondary" fontWeight="medium">
           Rongbuk Devices
-        </Heading>
+        </Typography>
         <Button
+          variant="contained"
+          size="small"
           onClick={handleRefresh}
-          loading={refreshing}
-          loadingText="Refreshing"
-          // leftIcon={refreshing ? <Spinner size="sm" /> : <RepeatIcon />} TODO:
-          colorScheme="blue"
-          size="sm"
+          disabled={refreshing}
+          startIcon={
+            refreshing ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <RefreshIcon />
+            )
+          }
         >
-          Refresh
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
-      </Flex>
+      </Box>
 
       {/* Device Table */}
-      <Box
-        border="1px solid"
-        borderColor="gray.200"
-        borderRadius="lg"
-        overflow="hidden"
+      <TableContainer
+        component={Paper}
+        variant="outlined"
+        sx={{ borderRadius: 2 }}
       >
-        <Table variant="simple" size="md">
-          <Thead bg="gray.50">
-            <Tr>
-              <Th color="gray.600" fontWeight="bold">
+        <Table size="medium">
+          <TableHead sx={{ bgcolor: 'grey.50' }}>
+            <TableRow>
+              <TableCell
+                sx={{
+                  color: 'text.secondary',
+                  fontWeight: 'bold',
+                }}
+              >
                 Device Name
-              </Th>
-              <Th color="gray.600" fontWeight="bold">
+              </TableCell>
+              <TableCell
+                sx={{
+                  color: 'text.secondary',
+                  fontWeight: 'bold',
+                }}
+              >
                 Location
-              </Th>
-              <Th color="gray.600" fontWeight="bold" textAlign="right">
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{
+                  color: 'text.secondary',
+                  fontWeight: 'bold',
+                }}
+              >
                 Actions
-              </Th>
-            </Tr>
-          </Thead>
-          <Tbody>
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {devices.length === 0 ? (
-              <Tr>
-                <Td colSpan={3} textAlign="center" py={12}>
-                  <Text color="gray.500" fontStyle="italic">
+              <TableRow>
+                <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
+                  <Typography
+                    color="text.secondary"
+                    fontStyle="italic"
+                    variant="body2"
+                  >
                     No devices found. Click refresh to scan for devices.
-                  </Text>
-                </Td>
-              </Tr>
+                  </Typography>
+                </TableCell>
+              </TableRow>
             ) : (
               devices.map(device => {
                 const {
@@ -139,144 +177,108 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
                 } = getButtonState(device);
 
                 return (
-                  <Tr key={device.name} _hover={{ bg: 'gray.50' }}>
-                    <Td>
-                      <Text fontWeight="bold" color="gray.700">
-                        {device.name}
-                      </Text>
-                    </Td>
-                    <Td>
-                      <Text color="gray.600" fontSize="sm">
+                  <TableRow
+                    key={device.name}
+                    hover
+                    sx={{
+                      '&:hover': {
+                        bgcolor: 'grey.50',
+                      },
+                    }}
+                  >
+                    <TableCell>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: getConnectionColor(device.connectionState),
+                          }}
+                        />
+                        <Typography
+                          fontWeight="bold"
+                          color="text.primary"
+                          variant="body2"
+                        >
+                          {device.name}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography color="text.secondary" variant="body2">
                         {formatLocation(device.location)}
-                      </Text>
-                    </Td>
-                    <Td textAlign="right">
-                      <HStack justify="flex-end" gap={2}>
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent="flex-end"
+                      >
                         <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
                           onClick={() => {
                             debounce();
                             onConnect(device);
                           }}
                           disabled={isConnected || isTransitioning}
-                          colorScheme="green"
-                          size="sm"
-                          minW="80px"
-                          loading={isConnecting}
+                          startIcon={
+                            isConnecting ? (
+                              <CircularProgress size={14} color="inherit" />
+                            ) : (
+                              <ConnectIcon fontSize="small" />
+                            )
+                          }
+                          sx={{ minWidth: 100 }}
                         >
-                          Connect
+                          {isConnecting ? 'Connecting...' : 'Connect'}
                         </Button>
                         <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
                           onClick={() => {
                             debounce();
                             onDisconnect(device);
                           }}
                           disabled={!isConnected || isTransitioning}
-                          colorScheme="red"
-                          size="sm"
-                          minW="80px"
-                          loading={isDisconnecting}
+                          startIcon={
+                            isDisconnecting ? (
+                              <CircularProgress size={14} color="inherit" />
+                            ) : (
+                              <DisconnectIcon fontSize="small" />
+                            )
+                          }
+                          sx={{ minWidth: 100 }}
                         >
-                          Disconnect
+                          {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
                         </Button>
-                      </HStack>
-                    </Td>
-                  </Tr>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             )}
-          </Tbody>
+          </TableBody>
         </Table>
-      </Box>
+      </TableContainer>
 
       {/* Device count */}
       {devices.length > 0 && (
-        <Text mt={3} textAlign="right" fontSize="sm" color="gray.600">
+        <Typography
+          mt={2}
+          textAlign="right"
+          variant="body2"
+          color="text.secondary"
+        >
           {devices.length} device{devices.length !== 1 ? 's' : ''} found
-        </Text>
+        </Typography>
       )}
-    </Box>
+    </Paper>
   );
 };
-
-// Demo wrapper to show the component
-/*
-const App = () => {
-  const [devices, setDevices] = useState<RongbukDevice[]>([
-    {
-      name: 'USB Serial Port (COM14)',
-      location: 'COM14',
-      connectionState: 'DISCONNECTED',
-    },
-    {
-      name: 'USB-SERIAL CH340 (COM7)',
-      location: 'COM7',
-      connectionState: 'CONNECTED',
-    },
-    {
-      name: 'rongbuk-676700',
-      location: '192.168.3.119',
-      connectionState: 'DISCONNECTED',
-    },
-  ]);
-
-  const handleConnect = (device: RongbukDevice) => {
-    setDevices(prev =>
-      prev.map(d =>
-        d.name === device.name
-          ? { ...d, connectionState: 'CONNECTING' as const }
-          : d
-      )
-    );
-
-    // Simulate connection
-    setTimeout(() => {
-      setDevices(prev =>
-        prev.map(d =>
-          d.name === device.name
-            ? { ...d, connectionState: 'CONNECTED' as const }
-            : d
-        )
-      );
-    }, 1000);
-  };
-
-  const handleDisconnect = (device: RongbukDevice) => {
-    setDevices(prev =>
-      prev.map(d =>
-        d.name === device.name
-          ? { ...d, connectionState: 'DISCONNECTING' as const }
-          : d
-      )
-    );
-
-    // Simulate disconnection
-    setTimeout(() => {
-      setDevices(prev =>
-        prev.map(d =>
-          d.name === device.name
-            ? { ...d, connectionState: 'DISCONNECTED' as const }
-            : d
-        )
-      );
-    }, 1000);
-  };
-
-  const handleRefresh = async () => {
-    // Simulate refresh delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-  };
-
-  return (
-    <Box maxW="1200px" mx="auto" p={5}>
-      <Heading mb={6}>Ultrasonic Scanner Interface</Heading>
-      <RongbukDevices
-        devices={devices}
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
-        onRefresh={handleRefresh}
-      />
-    </Box>
-  );
-}; */
 
 export default RongbukDevices;

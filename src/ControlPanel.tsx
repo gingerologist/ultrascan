@@ -24,6 +24,9 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  Popover,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -37,6 +40,215 @@ interface JsonAngle {
   degree: number;
   masks: number[];
 }
+
+// Pattern unit configuration
+interface PatternUnit {
+  range: number;
+  position: 'top' | 'middle' | 'bottom' | 'none';
+}
+
+// PatternControl Component Props
+interface PatternControlProps {
+  units: PatternUnit[];
+  onUnitsChange: (units: PatternUnit[]) => void;
+  error?: string;
+  onErrorChange?: (error: string) => void;
+}
+
+// Standalone Pattern Control Component
+const PatternControl: React.FC<PatternControlProps> = ({
+  units,
+  onUnitsChange,
+  error,
+  onErrorChange,
+}) => {
+  const theme = useTheme();
+  const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
+  const [activeUnitIndex, setActiveUnitIndex] = useState<number>(-1);
+
+  // Handle pattern unit click
+  const handleUnitClick = (
+    event: React.MouseEvent<HTMLElement>,
+    index: number
+  ) => {
+    setPopoverAnchor(event.currentTarget);
+    setActiveUnitIndex(index);
+  };
+
+  // Handle popover close
+  const handlePopoverClose = () => {
+    setPopoverAnchor(null);
+    setActiveUnitIndex(-1);
+  };
+
+  // Update pattern unit
+  const updatePatternUnit = (index: number, updates: Partial<PatternUnit>) => {
+    const newUnits = [...units];
+    newUnits[index] = { ...newUnits[index], ...updates };
+    onUnitsChange(newUnits);
+
+    // Clear error when user makes changes
+    if (error && onErrorChange) {
+      onErrorChange('');
+    }
+  };
+
+  // Render a single pattern unit (3 squares)
+  const renderPatternUnit = (unit: PatternUnit, index: number) => {
+    // Check if this unit should be disabled (after any 'none' unit)
+    const isDisabled = units.slice(0, index).some(u => u.position === 'none');
+
+    const getSquareStyle = (position: 'top' | 'middle' | 'bottom') => {
+      const baseStyle = {
+        width: 30,
+        height: 12,
+        backgroundColor: isDisabled
+          ? theme.palette.grey[100]
+          : theme.palette.grey[200],
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '10px',
+        fontWeight: 'bold',
+        color: theme.palette.text.primary,
+      };
+
+      // Add thick top border if this position is selected
+      if (unit.position === position && !isDisabled) {
+        return {
+          ...baseStyle,
+          borderTop: `3px solid ${theme.palette.primary.main}`,
+        };
+      }
+
+      return baseStyle;
+    };
+
+    return (
+      <Box
+        key={index}
+        onClick={isDisabled ? undefined : e => handleUnitClick(e, index)}
+        sx={{
+          width: 30,
+          height: 36,
+          cursor: isDisabled ? 'default' : 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          opacity: isDisabled ? 0.3 : 1,
+          '&:hover': {
+            opacity: isDisabled ? 0.3 : 0.7,
+          },
+        }}
+      >
+        {/* Top Square */}
+        <Box sx={getSquareStyle('top')} />
+
+        {/* Middle Square */}
+        <Box sx={getSquareStyle('middle')} />
+
+        {/* Bottom Square - shows the range number */}
+        <Box sx={getSquareStyle('bottom')}>
+          {!isDisabled && unit.position !== 'none' ? unit.range : ''}
+        </Box>
+      </Box>
+    );
+  };
+
+  return (
+    <>
+      <Box display="flex" flexWrap="wrap" gap={0}>
+        {units.map((unit, index) => renderPatternUnit(unit, index))}
+      </Box>
+
+      {/* Pattern Configuration Popover */}
+      <Popover
+        open={Boolean(popoverAnchor)}
+        anchorEl={popoverAnchor}
+        onClose={handlePopoverClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+      >
+        <Box sx={{ p: 3, minWidth: 280 }}>
+          {activeUnitIndex >= 0 && (
+            <>
+              <Typography variant="subtitle2" gutterBottom>
+                Configure Unit {activeUnitIndex + 1}
+              </Typography>
+
+              {/* Range Slider */}
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <FormLabel>
+                  Range:{' '}
+                  <Box
+                    component="span"
+                    sx={{
+                      display: 'inline-block',
+                      minWidth: '20px',
+                      textAlign: 'right',
+                    }}
+                  >
+                    {units[activeUnitIndex]?.range}
+                  </Box>
+                </FormLabel>
+                <Slider
+                  value={units[activeUnitIndex]?.range || 2}
+                  onChange={(_, value) =>
+                    updatePatternUnit(activeUnitIndex, {
+                      range: value as number,
+                    })
+                  }
+                  min={2}
+                  max={32}
+                  step={1}
+                  marks={[
+                    { value: 2, label: '2' },
+                    { value: 32, label: '32' },
+                  ]}
+                  valueLabelDisplay="auto"
+                  size="small"
+                  sx={{ mt: 2 }}
+                />
+              </FormControl>
+
+              {/* Position Toggle Buttons */}
+              <FormControl fullWidth>
+                <FormLabel>Position</FormLabel>
+                <ToggleButtonGroup
+                  value={units[activeUnitIndex]?.position}
+                  exclusive
+                  onChange={(_, newValue) => {
+                    if (newValue !== null) {
+                      updatePatternUnit(activeUnitIndex, {
+                        position: newValue,
+                      });
+                    }
+                  }}
+                  sx={{ mt: 1 }}
+                  size="small"
+                  fullWidth
+                >
+                  <ToggleButton value="top">Top</ToggleButton>
+                  <ToggleButton value="middle">Middle</ToggleButton>
+                  <ToggleButton value="bottom">Bottom</ToggleButton>
+                  {/* Only show 'None' option if not the first segment (index 0) */}
+                  {activeUnitIndex > 0 && (
+                    <ToggleButton value="none">None</ToggleButton>
+                  )}
+                </ToggleButtonGroup>
+              </FormControl>
+            </>
+          )}
+        </Box>
+      </Popover>
+    </>
+  );
+};
 
 type JsonPatternSegment = [number, number]; // [duration, level]
 type CharPatternLevel = 'F' | 'M' | 'P' | 'G';
@@ -80,8 +292,19 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const [showJson, setShowJson] = useState(false);
   const [patternError, setPatternError] = useState<string>('');
 
-  // Pattern management - simplified to just text input
-  const [patternText, setPatternText] = useState('');
+  // Pattern management - 16 custom units
+  const [patternUnits, setPatternUnits] = useState<PatternUnit[]>(() => {
+    // Initialize with first unit as 'top' and rest as 'none'
+    return Array(16)
+      .fill(null)
+      .map((_, index) =>
+        index === 0
+          ? { range: 2, position: 'top' as const }
+          : { range: 2, position: 'none' as const }
+      );
+  });
+  const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
+  const [activeUnitIndex, setActiveUnitIndex] = useState<number>(-1);
 
   // Angle management - new approach with range slider and divisor
   const [angleRange, setAngleRange] = useState<[number, number]>([0, 0]);
@@ -176,7 +399,91 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
-  // Handle window range change with even number constraint
+  // Handle pattern unit click
+  const handleUnitClick = (
+    event: React.MouseEvent<HTMLElement>,
+    index: number
+  ) => {
+    setPopoverAnchor(event.currentTarget);
+    setActiveUnitIndex(index);
+  };
+
+  // Handle popover close
+  const handlePopoverClose = () => {
+    setPopoverAnchor(null);
+    setActiveUnitIndex(-1);
+  };
+
+  // Update pattern unit
+  const updatePatternUnit = (index: number, updates: Partial<PatternUnit>) => {
+    const newUnits = [...patternUnits];
+    newUnits[index] = { ...newUnits[index], ...updates };
+    setPatternUnits(newUnits);
+  };
+
+  // Render a single pattern unit (3 squares)
+  const renderPatternUnit = (unit: PatternUnit, index: number) => {
+    // Check if this unit should be disabled (after any 'none' unit)
+    const isDisabled = patternUnits
+      .slice(0, index)
+      .some(u => u.position === 'none');
+
+    const getSquareStyle = (position: 'top' | 'middle' | 'bottom') => {
+      const baseStyle = {
+        width: 30,
+        height: 12,
+        backgroundColor: isDisabled
+          ? theme.palette.grey[100]
+          : theme.palette.grey[200],
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '10px',
+        fontWeight: 'bold',
+        color: theme.palette.text.primary,
+      };
+
+      // Add thick top border if this position is selected
+      if (unit.position === position && !isDisabled) {
+        return {
+          ...baseStyle,
+          borderTop: `3px solid ${theme.palette.primary.main}`,
+        };
+      }
+
+      return baseStyle;
+    };
+
+    return (
+      <Box
+        key={index}
+        onClick={isDisabled ? undefined : e => handleUnitClick(e, index)}
+        sx={{
+          width: 30,
+          height: 36,
+          cursor: isDisabled ? 'default' : 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          opacity: isDisabled ? 0.3 : 1,
+          '&:hover': {
+            opacity: isDisabled ? 0.3 : 0.7,
+          },
+        }}
+      >
+        {/* Top Square */}
+        <Box sx={getSquareStyle('top')} />
+
+        {/* Middle Square */}
+        <Box sx={getSquareStyle('middle')} />
+
+        {/* Bottom Square - shows the range number */}
+        <Box sx={getSquareStyle('bottom')}>
+          {!isDisabled && unit.position !== 'none' ? unit.range : ''}
+        </Box>
+      </Box>
+    );
+  };
+
   const handleWindowRangeChange = (
     event: Event,
     newValue: number | number[]
@@ -200,9 +507,12 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   const generateConfig = () => {
-    // Basic pattern validation
-    if (!patternText.trim()) {
-      setPatternError('Pattern text is required');
+    // Validate pattern units - at least one should be configured
+    const hasConfiguredUnits = patternUnits.some(
+      unit => unit.position !== 'none'
+    );
+    if (!hasConfiguredUnits) {
+      setPatternError('At least one pattern unit must be configured');
       return;
     }
     setPatternError('');
@@ -228,7 +538,15 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     setJsonOutput('');
     setShowJson(false);
     setPatternError('');
-    setPatternText('');
+    // Reset first unit to 'top' instead of 'none' since first segment cannot be 'none'
+    const resetUnits = Array(16)
+      .fill(null)
+      .map((_, index) =>
+        index === 0
+          ? { range: 2, position: 'top' as const }
+          : { range: 2, position: 'none' as const }
+      );
+    setPatternUnits(resetUnits);
     setAngleRange([0, 0]);
     setSelectedDivisor(2);
     setAvailableDivisors([]);
@@ -386,17 +704,98 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
               )}
             </TableCell>
             <TableCell colSpan={2}>
-              <TextField
-                fullWidth
-                size="small"
-                value={patternText}
-                onChange={e => {
-                  setPatternText(e.target.value);
-                  if (patternError) setPatternError('');
+              <Box display="flex" flexWrap="wrap" gap={0}>
+                {patternUnits.map((unit, index) =>
+                  renderPatternUnit(unit, index)
+                )}
+              </Box>
+
+              {/* Pattern Configuration Popover */}
+              <Popover
+                open={Boolean(popoverAnchor)}
+                anchorEl={popoverAnchor}
+                onClose={handlePopoverClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'center',
                 }}
-                placeholder="Enter pattern text here..."
-                error={!!patternError}
-              />
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'center',
+                }}
+              >
+                <Box sx={{ p: 3, minWidth: 280 }}>
+                  {activeUnitIndex >= 0 && (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Configure Unit {activeUnitIndex + 1}
+                      </Typography>
+
+                      {/* Range Slider */}
+                      <FormControl fullWidth sx={{ mb: 3 }}>
+                        <FormLabel>
+                          Range:{' '}
+                          <Box
+                            component="span"
+                            sx={{
+                              display: 'inline-block',
+                              minWidth: '20px',
+                              textAlign: 'right',
+                            }}
+                          >
+                            {patternUnits[activeUnitIndex]?.range}
+                          </Box>
+                        </FormLabel>
+                        <Slider
+                          value={patternUnits[activeUnitIndex]?.range || 2}
+                          onChange={(_, value) =>
+                            updatePatternUnit(activeUnitIndex, {
+                              range: value as number,
+                            })
+                          }
+                          min={2}
+                          max={32}
+                          step={1}
+                          marks={[
+                            { value: 2, label: '2' },
+                            { value: 32, label: '32' },
+                          ]}
+                          valueLabelDisplay="auto"
+                          size="small"
+                          sx={{ mt: 2 }}
+                        />
+                      </FormControl>
+
+                      {/* Position Toggle Buttons */}
+                      <FormControl fullWidth>
+                        <FormLabel>Position</FormLabel>
+                        <ToggleButtonGroup
+                          value={patternUnits[activeUnitIndex]?.position}
+                          exclusive
+                          onChange={(_, newValue) => {
+                            if (newValue !== null) {
+                              updatePatternUnit(activeUnitIndex, {
+                                position: newValue,
+                              });
+                            }
+                          }}
+                          sx={{ mt: 1 }}
+                          size="small"
+                          fullWidth
+                        >
+                          <ToggleButton value="top">Top</ToggleButton>
+                          <ToggleButton value="middle">Middle</ToggleButton>
+                          <ToggleButton value="bottom">Bottom</ToggleButton>
+                          {/* Only show 'None' option if not the first segment (index 0) */}
+                          {activeUnitIndex > 0 && (
+                            <ToggleButton value="none">None</ToggleButton>
+                          )}
+                        </ToggleButtonGroup>
+                      </FormControl>
+                    </>
+                  )}
+                </Box>
+              </Popover>
             </TableCell>
           </TableRow>
 

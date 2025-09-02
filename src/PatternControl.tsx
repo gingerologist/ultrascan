@@ -73,10 +73,10 @@ const PatternControl: React.FC<PatternControlProps> = ({
     const getSquareStyle = (position: 'top' | 'middle' | 'bottom') => {
       const baseStyle = {
         width: 30,
-        height: 12,
+        height: 30,
         backgroundColor: isDisabled
-          ? theme.palette.grey[100]
-          : theme.palette.grey[200],
+          ? theme.palette.background.default
+          : theme.palette.grey[100],
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -91,9 +91,12 @@ const PatternControl: React.FC<PatternControlProps> = ({
           ...baseStyle,
           borderTop: `3px solid ${theme.palette.primary.main}`,
         };
+      } else {
+        return {
+          ...baseStyle,
+          borderTop: `3px solid ${theme.palette.grey[200]}`,
+        };
       }
-
-      return baseStyle;
     };
 
     return (
@@ -102,7 +105,7 @@ const PatternControl: React.FC<PatternControlProps> = ({
         onClick={isDisabled ? undefined : e => handleUnitClick(e, index)}
         sx={{
           width: 30,
-          height: 36,
+          height: 90,
           cursor: isDisabled ? 'default' : 'pointer',
           display: 'flex',
           flexDirection: 'column',
@@ -150,7 +153,7 @@ const PatternControl: React.FC<PatternControlProps> = ({
           {activeUnitIndex >= 0 && (
             <>
               <Typography variant="subtitle2" gutterBottom>
-                Configure Unit {activeUnitIndex + 1}
+                Configure Segment {activeUnitIndex + 1}
               </Typography>
 
               {/* Range Slider */}
@@ -205,9 +208,9 @@ const PatternControl: React.FC<PatternControlProps> = ({
                   size="small"
                   fullWidth
                 >
-                  <ToggleButton value="top">Top</ToggleButton>
-                  <ToggleButton value="middle">Middle</ToggleButton>
-                  <ToggleButton value="bottom">Bottom</ToggleButton>
+                  <ToggleButton value="top">正电平</ToggleButton>
+                  <ToggleButton value="middle">地电平</ToggleButton>
+                  <ToggleButton value="bottom">负电平</ToggleButton>
                   {/* Only show 'None' option if not the first segment (index 0) */}
                   {activeUnitIndex > 0 && (
                     <ToggleButton value="none">None</ToggleButton>

@@ -164,7 +164,7 @@ const UltrasonicScannerApp: React.FC = () => {
       <ControlPanel
         onConfigChange={(config: JsonConfig) => {
           setCurrentConfig(config);
-          console.log('Configuration updated:', config);
+          // console.log('Configuration updated:', config);
         }}
       />
 

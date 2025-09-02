@@ -249,7 +249,7 @@ const createMainWindow = (): void => {
 
   // const menu = Menu.buildFromTemplate(menuTemplate);
   // Menu.setApplicationMenu(menu);
-  addTestingMenuToMainWindow(mainWindow);
+  // addTestingMenuToMainWindow(mainWindow);
 
   ipcMain.on('user-refresh-devices', () => {
     discoverDevices(device => {

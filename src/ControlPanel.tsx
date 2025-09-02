@@ -5,20 +5,11 @@ import {
   Typography,
   Button,
   Stack,
-  Grid,
   FormControl,
   FormLabel,
-  TextField,
   Select,
   MenuItem,
   Slider,
-  Alert,
-  AlertTitle,
-  Chip,
-  Divider,
-  IconButton,
-  Card,
-  CardContent,
   useTheme,
   Table,
   TableBody,
@@ -28,227 +19,23 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
+
 import {
-  Delete as DeleteIcon,
   ContentCopy as CopyIcon,
-  Add as AddIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
+
+import { styled } from '@mui/material/styles';
+import { SxProps } from '@mui/material/styles';
+
+import PatternControl from './PatternControl';
+import type { PatternUnit } from './PatternControl';
 
 // Type definitions matching your schema
 interface JsonAngle {
   degree: number;
   masks: number[];
 }
-
-// Pattern unit configuration
-interface PatternUnit {
-  range: number;
-  position: 'top' | 'middle' | 'bottom' | 'none';
-}
-
-// PatternControl Component Props
-interface PatternControlProps {
-  units: PatternUnit[];
-  onUnitsChange: (units: PatternUnit[]) => void;
-  error?: string;
-  onErrorChange?: (error: string) => void;
-}
-
-// Standalone Pattern Control Component
-const PatternControl: React.FC<PatternControlProps> = ({
-  units,
-  onUnitsChange,
-  error,
-  onErrorChange,
-}) => {
-  const theme = useTheme();
-  const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
-  const [activeUnitIndex, setActiveUnitIndex] = useState<number>(-1);
-
-  // Handle pattern unit click
-  const handleUnitClick = (
-    event: React.MouseEvent<HTMLElement>,
-    index: number
-  ) => {
-    setPopoverAnchor(event.currentTarget);
-    setActiveUnitIndex(index);
-  };
-
-  // Handle popover close
-  const handlePopoverClose = () => {
-    setPopoverAnchor(null);
-    setActiveUnitIndex(-1);
-  };
-
-  // Update pattern unit
-  const updatePatternUnit = (index: number, updates: Partial<PatternUnit>) => {
-    const newUnits = [...units];
-    newUnits[index] = { ...newUnits[index], ...updates };
-    onUnitsChange(newUnits);
-
-    // Clear error when user makes changes
-    if (error && onErrorChange) {
-      onErrorChange('');
-    }
-  };
-
-  // Render a single pattern unit (3 squares)
-  const renderPatternUnit = (unit: PatternUnit, index: number) => {
-    // Check if this unit should be disabled (after any 'none' unit)
-    const isDisabled = units.slice(0, index).some(u => u.position === 'none');
-
-    const getSquareStyle = (position: 'top' | 'middle' | 'bottom') => {
-      const baseStyle = {
-        width: 30,
-        height: 12,
-        backgroundColor: isDisabled
-          ? theme.palette.grey[100]
-          : theme.palette.grey[200],
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '10px',
-        fontWeight: 'bold',
-        color: theme.palette.text.primary,
-      };
-
-      // Add thick top border if this position is selected
-      if (unit.position === position && !isDisabled) {
-        return {
-          ...baseStyle,
-          borderTop: `3px solid ${theme.palette.primary.main}`,
-        };
-      }
-
-      return baseStyle;
-    };
-
-    return (
-      <Box
-        key={index}
-        onClick={isDisabled ? undefined : e => handleUnitClick(e, index)}
-        sx={{
-          width: 30,
-          height: 36,
-          cursor: isDisabled ? 'default' : 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          opacity: isDisabled ? 0.3 : 1,
-          '&:hover': {
-            opacity: isDisabled ? 0.3 : 0.7,
-          },
-        }}
-      >
-        {/* Top Square */}
-        <Box sx={getSquareStyle('top')} />
-
-        {/* Middle Square */}
-        <Box sx={getSquareStyle('middle')} />
-
-        {/* Bottom Square - shows the range number */}
-        <Box sx={getSquareStyle('bottom')}>
-          {!isDisabled && unit.position !== 'none' ? unit.range : ''}
-        </Box>
-      </Box>
-    );
-  };
-
-  return (
-    <>
-      <Box display="flex" flexWrap="wrap" gap={0}>
-        {units.map((unit, index) => renderPatternUnit(unit, index))}
-      </Box>
-
-      {/* Pattern Configuration Popover */}
-      <Popover
-        open={Boolean(popoverAnchor)}
-        anchorEl={popoverAnchor}
-        onClose={handlePopoverClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'center',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'center',
-        }}
-      >
-        <Box sx={{ p: 3, minWidth: 280 }}>
-          {activeUnitIndex >= 0 && (
-            <>
-              <Typography variant="subtitle2" gutterBottom>
-                Configure Unit {activeUnitIndex + 1}
-              </Typography>
-
-              {/* Range Slider */}
-              <FormControl fullWidth sx={{ mb: 3 }}>
-                <FormLabel>
-                  Range:{' '}
-                  <Box
-                    component="span"
-                    sx={{
-                      display: 'inline-block',
-                      minWidth: '20px',
-                      textAlign: 'right',
-                    }}
-                  >
-                    {units[activeUnitIndex]?.range}
-                  </Box>
-                </FormLabel>
-                <Slider
-                  value={units[activeUnitIndex]?.range || 2}
-                  onChange={(_, value) =>
-                    updatePatternUnit(activeUnitIndex, {
-                      range: value as number,
-                    })
-                  }
-                  min={2}
-                  max={32}
-                  step={1}
-                  marks={[
-                    { value: 2, label: '2' },
-                    { value: 32, label: '32' },
-                  ]}
-                  valueLabelDisplay="auto"
-                  size="small"
-                  sx={{ mt: 2 }}
-                />
-              </FormControl>
-
-              {/* Position Toggle Buttons */}
-              <FormControl fullWidth>
-                <FormLabel>Position</FormLabel>
-                <ToggleButtonGroup
-                  value={units[activeUnitIndex]?.position}
-                  exclusive
-                  onChange={(_, newValue) => {
-                    if (newValue !== null) {
-                      updatePatternUnit(activeUnitIndex, {
-                        position: newValue,
-                      });
-                    }
-                  }}
-                  sx={{ mt: 1 }}
-                  size="small"
-                  fullWidth
-                >
-                  <ToggleButton value="top">Top</ToggleButton>
-                  <ToggleButton value="middle">Middle</ToggleButton>
-                  <ToggleButton value="bottom">Bottom</ToggleButton>
-                  {/* Only show 'None' option if not the first segment (index 0) */}
-                  {activeUnitIndex > 0 && (
-                    <ToggleButton value="none">None</ToggleButton>
-                  )}
-                </ToggleButtonGroup>
-              </FormControl>
-            </>
-          )}
-        </Box>
-      </Popover>
-    </>
-  );
-};
 
 type JsonPatternSegment = [number, number]; // [duration, level]
 type CharPatternLevel = 'F' | 'M' | 'P' | 'G';
@@ -275,6 +62,58 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   onConfigChange,
 }) => {
   const theme = useTheme();
+
+  const iOSBoxShadow =
+    '0 3px 1px rgba(0,0,0,0.1),0 4px 8px rgba(0,0,0,0.13),0 0 0 1px rgba(0,0,0,0.02)';
+
+  const iosStyleEx: SxProps = {
+    color: '#007bff',
+    height: 5,
+    padding: '15px 0',
+    '& .MuiSlider-thumb': {
+      height: 20,
+      width: 20,
+      backgroundColor: '#fff',
+      boxShadow: '0 0 2px 0px rgba(0, 0, 0, 0.1)',
+      '&:focus, &:hover, &.Mui-active': {
+        boxShadow: '0px 0px 3px 1px rgba(0, 0, 0, 0.1)',
+        // Reset on touch devices, it doesn't add specificity
+        '@media (hover: none)': {
+          boxShadow: iOSBoxShadow,
+        },
+      },
+      '&:before': {
+        boxShadow:
+          '0px 0px 1px 0px rgba(0,0,0,0.2), 0px 0px 0px 0px rgba(0,0,0,0.14), 0px 0px 1px 0px rgba(0,0,0,0.12)',
+      },
+    },
+    '& .MuiSlider-valueLabel': {
+      fontSize: 12,
+      fontWeight: 'normal',
+      top: -6,
+      backgroundColor: 'unset',
+      color: theme.palette.text.primary,
+      '&::before': {
+        display: 'none',
+      },
+      '& *': {
+        background: 'transparent',
+        color: '#000',
+        ...theme.applyStyles('dark', {
+          color: '#fff',
+        }),
+      },
+    },
+    '& .MuiSlider-track': {
+      border: 'none',
+      height: 5,
+    },
+    '& .MuiSlider-rail': {
+      opacity: 0.5,
+      boxShadow: 'inset 0px 0px 4px -2px #000',
+      backgroundColor: '#d0d0d0',
+    },
+  };
 
   const [config, setConfig] = useState<JsonConfig>({
     version: '1.0',
@@ -313,20 +152,6 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
 
   // Steps control
   const [steps, setSteps] = useState(1);
-
-  const levelMap: Record<CharPatternLevel, number> = {
-    F: 0, // Float
-    M: 1, // Minus (negative)
-    P: 2, // Positive
-    G: 3, // Ground
-  };
-
-  const levelDisplayMap: Record<number, string> = {
-    0: 'F (Float)',
-    1: 'M (Minus)',
-    2: 'P (Positive)',
-    3: 'G (Ground)',
-  };
 
   // Generate default mask (all zeros for simplicity)
   const generateDefaultMask = () => {
@@ -431,10 +256,11 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     const getSquareStyle = (position: 'top' | 'middle' | 'bottom') => {
       const baseStyle = {
         width: 30,
-        height: 12,
+        height: 40,
+        boxSizing: 'border-box',
         backgroundColor: isDisabled
-          ? theme.palette.grey[100]
-          : theme.palette.grey[200],
+          ? theme.palette.grey[50]
+          : theme.palette.grey[100],
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -451,7 +277,10 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
         };
       }
 
-      return baseStyle;
+      return {
+        ...baseStyle,
+        borderTop: `3px solid ${theme.palette.grey[200]}`,
+      };
     };
 
     return (
@@ -460,7 +289,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
         onClick={isDisabled ? undefined : e => handleUnitClick(e, index)}
         sx={{
           width: 30,
-          height: 36,
+          height: 120,
           cursor: isDisabled ? 'default' : 'pointer',
           display: 'flex',
           flexDirection: 'column',
@@ -562,6 +391,19 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
+  //getAriaValueText={valueLabelFormat}
+  // const valueLabelFormat = (value: string) => `${value}`;
+  const getAriaValueText = (value: number, index: number) => {
+    // 根据索引区分两个滑块
+    if (index === 0) {
+      return `最小值：${value}`; // 第一个滑块（最小值）
+    } else {
+      return `最大值：${value}`; // 第二个滑块（最大值）
+    }
+  };
+
+  const tableRowSx: SxProps = { height: 136 };
+
   return (
     <Paper
       elevation={2}
@@ -600,8 +442,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
       <Table sx={{ '& td': { border: 0, py: 1.5 } }}>
         <TableBody>
           {/* Angles Row */}
-          <TableRow>
-            <TableCell sx={{ width: '20%', verticalAlign: 'top', pr: 3 }}>
+          <TableRow sx={tableRowSx}>
+            <TableCell sx={{ width: '20%', verticalAlign: 'middle', pr: 3 }}>
               <Typography
                 variant="subtitle2"
                 color="text.secondary"
@@ -615,9 +457,10 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   : `${angleRange[0]}° to ${angleRange[1]}°`}
               </Typography>
             </TableCell>
-            <TableCell sx={{ width: '50%' }}>
+            <TableCell sx={{ width: '60%', verticalAlign: 'bottom' }}>
               <Slider
                 value={angleRange}
+                getAriaValueText={getAriaValueText}
                 onChange={handleAngleRangeChange}
                 min={-45}
                 max={45}
@@ -627,13 +470,15 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   { value: 0, label: '0°' },
                   { value: 45, label: '45°' },
                 ]}
-                valueLabelDisplay="auto"
+                valueLabelDisplay="on"
                 valueLabelFormat={value => `${value}°`}
                 size="small"
+                sx={iosStyleEx}
               />
             </TableCell>
-            <TableCell sx={{ width: '30%', pl: 2 }}>
+            <TableCell sx={{ width: '20%', pl: 2 }}>
               <Select
+                variant="standard"
                 value={selectedDivisor}
                 onChange={e => setSelectedDivisor(e.target.value as number)}
                 size="small"
@@ -643,7 +488,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
               >
                 {availableDivisors.length === 0 ? (
                   <MenuItem value={2} disabled>
-                    No divisions
+                    -
                   </MenuItem>
                 ) : (
                   availableDivisors.map(divisor => (
@@ -657,8 +502,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
           </TableRow>
 
           {/* Steps Row */}
-          <TableRow>
-            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+          <TableRow sx={tableRowSx}>
+            <TableCell sx={{ verticalAlign: 'middle', pr: 3 }}>
               <Typography
                 variant="subtitle2"
                 color="text.secondary"
@@ -670,7 +515,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 {steps}
               </Typography>
             </TableCell>
-            <TableCell colSpan={2}>
+            <TableCell colSpan={1} sx={{ verticalAlign: 'bottom' }}>
               <Slider
                 value={steps}
                 onChange={(_, value) => setSteps(value as number)}
@@ -681,15 +526,16 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   { value: 1, label: '1' },
                   { value: 32, label: '32' },
                 ]}
-                valueLabelDisplay="auto"
+                valueLabelDisplay="on"
                 size="small"
+                sx={iosStyleEx}
               />
             </TableCell>
           </TableRow>
 
           {/* Pattern Row */}
-          <TableRow>
-            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+          <TableRow sx={tableRowSx}>
+            <TableCell sx={{ verticalAlign: 'middle', pr: 3 }}>
               <Typography
                 variant="subtitle2"
                 color="text.secondary"
@@ -703,7 +549,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 </Typography>
               )}
             </TableCell>
-            <TableCell colSpan={2}>
+            <TableCell colSpan={1}>
               <Box display="flex" flexWrap="wrap" gap={0}>
                 {patternUnits.map((unit, index) =>
                   renderPatternUnit(unit, index)
@@ -727,14 +573,14 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 <Box sx={{ p: 3, minWidth: 280 }}>
                   {activeUnitIndex >= 0 && (
                     <>
-                      <Typography variant="subtitle2" gutterBottom>
+                      {/* <Typography variant="subtitle2" gutterBottom>
                         Configure Unit {activeUnitIndex + 1}
-                      </Typography>
+                      </Typography> */}
 
                       {/* Range Slider */}
                       <FormControl fullWidth sx={{ mb: 3 }}>
                         <FormLabel>
-                          Range:{' '}
+                          PER:{' '}
                           <Box
                             component="span"
                             sx={{
@@ -760,16 +606,18 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                             { value: 2, label: '2' },
                             { value: 32, label: '32' },
                           ]}
-                          valueLabelDisplay="auto"
+                          valueLabelDisplay="off"
                           size="small"
                           sx={{ mt: 2 }}
+                          // sx={iosStyleEx}
                         />
                       </FormControl>
 
                       {/* Position Toggle Buttons */}
                       <FormControl fullWidth>
-                        <FormLabel>Position</FormLabel>
+                        <FormLabel>LVL</FormLabel>
                         <ToggleButtonGroup
+                          color="primary"
                           value={patternUnits[activeUnitIndex]?.position}
                           exclusive
                           onChange={(_, newValue) => {
@@ -783,9 +631,9 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                           size="small"
                           fullWidth
                         >
-                          <ToggleButton value="top">Top</ToggleButton>
-                          <ToggleButton value="middle">Middle</ToggleButton>
-                          <ToggleButton value="bottom">Bottom</ToggleButton>
+                          <ToggleButton value="top">正高压</ToggleButton>
+                          <ToggleButton value="middle">地</ToggleButton>
+                          <ToggleButton value="bottom">负高压</ToggleButton>
                           {/* Only show 'None' option if not the first segment (index 0) */}
                           {activeUnitIndex > 0 && (
                             <ToggleButton value="none">None</ToggleButton>
@@ -800,8 +648,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
           </TableRow>
 
           {/* Repeat Row */}
-          <TableRow>
-            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+          <TableRow sx={tableRowSx}>
+            <TableCell sx={{ verticalAlign: 'middle', pr: 3 }}>
               <Typography
                 variant="subtitle2"
                 color="text.secondary"
@@ -813,7 +661,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 {config.repeat}
               </Typography>
             </TableCell>
-            <TableCell colSpan={2}>
+            <TableCell colSpan={1}>
               <Slider
                 value={config.repeat}
                 onChange={(_, value) =>
@@ -826,15 +674,16 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   { value: 1, label: '1' },
                   { value: 31, label: '31' },
                 ]}
-                valueLabelDisplay="auto"
+                valueLabelDisplay="on"
                 size="small"
+                sx={iosStyleEx}
               />
             </TableCell>
           </TableRow>
 
           {/* Tail Row */}
-          <TableRow>
-            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+          <TableRow sx={tableRowSx}>
+            <TableCell sx={{ verticalAlign: 'middle', pr: 3 }}>
               <Typography
                 variant="subtitle2"
                 color="text.secondary"
@@ -846,7 +695,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 {config.tail}
               </Typography>
             </TableCell>
-            <TableCell colSpan={2}>
+            <TableCell colSpan={1}>
               <Slider
                 value={config.tail}
                 onChange={(_, value) => updateConfig({ tail: value as number })}
@@ -857,15 +706,16 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   { value: 2, label: '2' },
                   { value: 32, label: '32' },
                 ]}
-                valueLabelDisplay="auto"
+                valueLabelDisplay="on"
                 size="small"
+                sx={iosStyleEx}
               />
             </TableCell>
           </TableRow>
 
           {/* Window Row */}
-          <TableRow>
-            <TableCell sx={{ verticalAlign: 'top', pr: 3 }}>
+          <TableRow sx={tableRowSx}>
+            <TableCell sx={{ verticalAlign: 'middle', pr: 3 }}>
               <Typography
                 variant="subtitle2"
                 color="text.secondary"
@@ -877,7 +727,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 {config.startUs}μs - {config.endUs}μs
               </Typography>
             </TableCell>
-            <TableCell colSpan={2}>
+            <TableCell colSpan={1}>
               <Slider
                 value={[config.startUs, config.endUs]}
                 onChange={handleWindowRangeChange}
@@ -888,11 +738,13 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   { value: 20, label: '20μs' },
                   { value: 200, label: '200μs' },
                 ]}
-                valueLabelDisplay="auto"
+                valueLabelDisplay="on"
                 valueLabelFormat={value => `${value}μs`}
                 size="small"
+                sx={iosStyleEx}
               />
             </TableCell>
+            <TableCell>no comment</TableCell>
           </TableRow>
         </TableBody>
       </Table>

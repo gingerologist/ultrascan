@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -137,6 +137,74 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const [patternUnits, setPatternUnits] =
     useState<PatternUnit[]>(defaultPattern);
 
+  // Calculate masks for ultrasonic channels based on steps
+  const calculateMasks = useCallback((steps: number): number[] => {
+    const masks: number[] = [];
+
+    if (steps === 1) {
+      // All channels [0..31] allowed (all bits 0)
+      return [0x00000000];
+    }
+
+    // Calculate the number of channels per step
+    const channelsPerStep = 32 - steps + 1;
+
+    for (let step = 0; step < steps; step++) {
+      let mask = 0xffffffff; // Start with all bits set (all channels powered down)
+
+      // For step i, enable channels [i..i+channelsPerStep-1]
+      const startChannel = step;
+      const endChannel = step + channelsPerStep - 1;
+
+      // Clear bits for channels that should be powered on (bit 0 = allowed)
+      for (let channel = startChannel; channel <= endChannel; channel++) {
+        mask &= ~(1 << channel);
+      }
+
+      masks.push(mask >>> 0); // Ensure unsigned 32-bit integer
+    }
+
+    return masks;
+  }, []);
+
+  // Calculate angles from UI controls
+  const calculateAngles = useCallback((): JsonAngle[] => {
+    const [start, end] = angleRange;
+    const range = Math.abs(end - start);
+
+    if (range === 0 || availableDivisors.length === 0) {
+      return [];
+    }
+
+    const stepSize = range / selectedDivisor;
+    const angles: JsonAngle[] = [];
+    const masks = calculateMasks(steps);
+
+    for (let i = 0; i <= selectedDivisor; i++) {
+      const degree = start + i * stepSize;
+
+      angles.push({
+        degree: Math.round(degree * 100) / 100, // Round to 2 decimal places
+        masks: masks,
+      });
+    }
+
+    return angles;
+  }, [angleRange, selectedDivisor, availableDivisors, steps, calculateMasks]);
+
+  // Calculate patterns from pattern units
+  const calculatePatterns = useCallback((): JsonPatternSegment[] => {
+    const patterns: JsonPatternSegment[] = [];
+
+    patternUnits.forEach(unit => {
+      const level =
+        unit.position === 'top' ? 1 : unit.position === 'bottom' ? -1 : 0;
+      patterns.push([unit.range, level]);
+    });
+
+    return patterns;
+  }, [patternUnits]);
+
   const updateConfig = useCallback(
     (updates: Partial<JsonConfig>) => {
       const newConfig = { ...config, ...updates };
@@ -148,6 +216,24 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     },
     [config, onConfigChange]
   );
+
+  // Update config whenever calculated values change
+  useEffect(() => {
+    const newAngles = calculateAngles();
+    const newPatterns = calculatePatterns();
+
+    updateConfig({
+      angles: newAngles,
+      patterns: newPatterns,
+    });
+  }, [
+    angleRange,
+    selectedDivisor,
+    steps,
+    patternUnits,
+    calculateAngles,
+    calculatePatterns,
+  ]);
 
   const resetConfig = () => {
     setConfig(defaultConfig);

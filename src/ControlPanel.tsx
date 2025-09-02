@@ -661,7 +661,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 {config.repeat}
               </Typography>
             </TableCell>
-            <TableCell colSpan={1}>
+            <TableCell colSpan={1} sx={{ verticalAlign: 'bottom' }}>
               <Slider
                 value={config.repeat}
                 onChange={(_, value) =>
@@ -695,7 +695,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 {config.tail}
               </Typography>
             </TableCell>
-            <TableCell colSpan={1}>
+            <TableCell colSpan={1} sx={{ verticalAlign: 'bottom' }}>
               <Slider
                 value={config.tail}
                 onChange={(_, value) => updateConfig({ tail: value as number })}

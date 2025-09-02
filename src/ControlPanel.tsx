@@ -196,11 +196,35 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const calculatePatterns = useCallback((): JsonPatternSegment[] => {
     const patterns: JsonPatternSegment[] = [];
 
-    patternUnits.forEach(unit => {
-      const level =
-        unit.position === 'top' ? 1 : unit.position === 'bottom' ? -1 : 0;
-      patterns.push([unit.range, level]);
-    });
+    // Process pattern units until we hit the first 'none' (terminator)
+    for (const unit of patternUnits) {
+      if (unit.position === 'none') {
+        // First 'none' acts as terminator, stop processing
+        break;
+      }
+
+      // Map positions to register values:
+      // bottom (negative high voltage) -> 1
+      // top (positive high voltage) -> 2
+      // middle (ground level) -> 3
+      let registerValue: number;
+      switch (unit.position) {
+        case 'bottom':
+          registerValue = 1;
+          break;
+        case 'top':
+          registerValue = 2;
+          break;
+        case 'middle':
+          registerValue = 3;
+          break;
+        default:
+          // This shouldn't happen since we break on 'none', but just in case
+          continue;
+      }
+
+      patterns.push([unit.range, registerValue]);
+    }
 
     return patterns;
   }, [patternUnits]);
@@ -257,38 +281,17 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     return divisors;
   };
 
-  // Handle angle range change with symmetric behavior
+  // Handle angle range change - now allows any range within -45 to 45
   const handleAngleRangeChange = (
     event: Event,
     newValue: number | number[]
   ) => {
     const [newStart, newEnd] = newValue as [number, number];
 
-    // Determine which thumb moved by comparing with current values
-    const [currentStart, currentEnd] = angleRange;
+    setAngleRange([newStart, newEnd]);
 
-    let symmetricRange: [number, number];
-
-    if (newStart !== currentStart) {
-      // Left thumb moved, mirror it to the right
-      symmetricRange = [newStart, -newStart];
-    } else if (newEnd !== currentEnd) {
-      // Right thumb moved, mirror it to the left
-      symmetricRange = [-newEnd, newEnd];
-    } else {
-      // No change or both changed somehow
-      symmetricRange = [newStart, newEnd];
-    }
-
-    // Ensure the range is valid (start <= end)
-    if (symmetricRange[0] > symmetricRange[1]) {
-      symmetricRange = [symmetricRange[1], symmetricRange[0]];
-    }
-
-    setAngleRange(symmetricRange);
-
-    // Calculate new divisors
-    const range = Math.abs(symmetricRange[1] - symmetricRange[0]);
+    // Calculate new divisors based on the range (regardless of symmetry)
+    const range = Math.abs(newEnd - newStart);
     const divisors = calculateDivisors(range);
     setAvailableDivisors(divisors);
 
@@ -375,7 +378,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
             <TableCell sx={{ width: '60%', verticalAlign: 'bottom' }}>
               <Slider
                 value={angleRange}
-                onChange={handleAngleRangeChange}
+                onChangeCommitted={handleAngleRangeChange}
                 min={-45}
                 max={45}
                 step={1}
@@ -388,6 +391,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 valueLabelFormat={value => `${value}°`}
                 size="small"
                 sx={iosStyleEx}
+                disableSwap
               />
             </TableCell>
             <TableCell sx={{ width: '20%', pl: 2 }}>
@@ -412,6 +416,34 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   ))
                 )}
               </Select>
+            </TableCell>
+          </TableRow>
+
+          {/* Calculated Angles Display Row */}
+          <TableRow>
+            <TableCell />
+            <TableCell colSpan={2} sx={{ py: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Calculated angles:</strong>{' '}
+                {(() => {
+                  const [start, end] = angleRange;
+                  const range = Math.abs(end - start);
+
+                  if (range === 0 || availableDivisors.length === 0) {
+                    return 'None';
+                  }
+
+                  const stepSize = range / selectedDivisor;
+                  const angles: number[] = [];
+
+                  for (let i = 0; i <= selectedDivisor; i++) {
+                    const degree = start + i * stepSize;
+                    angles.push(Math.round(degree * 100) / 100);
+                  }
+
+                  return angles.map(angle => `${angle}°`).join(', ');
+                })()}
+              </Typography>
             </TableCell>
           </TableRow>
 

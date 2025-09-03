@@ -11,7 +11,7 @@ const testConfig = {
   angles: [
     {
       degree: 0,
-      steps: [0],
+      masks: [0],
     },
   ],
   pattern: [

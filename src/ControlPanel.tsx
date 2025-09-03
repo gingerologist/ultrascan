@@ -45,7 +45,7 @@ export interface JsonConfig {
 }
 
 interface ControlPanelProps {
-  canSubmit?: boolean;
+  disableSumbit?: boolean;
   onSubmit?: (config: JsonConfig) => void;
   onConfigChange?: (config: JsonConfig) => void;
 }
@@ -127,7 +127,7 @@ const defaultPattern: PatternUnit[] = Array(16)
   );
 
 const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
-  canSubmit = false,
+  disableSumbit = true,
   onSubmit = () => {},
   onConfigChange,
 }) => {
@@ -276,6 +276,16 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     calculatePatterns,
   ]);
 
+  const printConfig = () => {
+    console.log('config', {
+      ...config,
+      angles: config.angles.map(angle => ({
+        ...angle,
+        bin: angle.masks.map(mask => mask.toString(2).padStart(32, '0')),
+      })),
+    });
+  };
+
   const resetConfig = () => {
     setConfig(defaultConfig);
     setPatternUnits(defaultPattern);
@@ -381,32 +391,30 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
         alignItems="center"
         mb={3}
       >
-        <Typography variant="h5" color="text.secondary" fontWeight="medium">
+        <Typography
+          variant="h5"
+          color="text.secondary"
+          fontWeight="medium"
+          onClick={printConfig}
+        >
           Scan Configuration
         </Typography>
         <Stack direction="row" spacing={2}>
           <Button
-            variant="outlined"
+            variant="text"
             startIcon={<RefreshIcon />}
             onClick={resetConfig}
+            size="small"
           >
             Reset
           </Button>
           <Button
-            variant="contained"
-            onClick={() => {
-              console.log('config', {
-                ...config,
-                angles: config.angles.map(angle => ({
-                  ...angle,
-                  bin: angle.masks.map(mask =>
-                    mask.toString(2).padStart(32, '0')
-                  ),
-                })),
-              });
-            }}
+            variant="text"
+            onClick={() => onSubmit(config)}
+            disabled={disableSumbit}
+            size="small"
           >
-            Unused
+            Submit
           </Button>
         </Stack>
       </Box>

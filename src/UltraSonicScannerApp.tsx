@@ -69,7 +69,7 @@ const ScanChart = ({ scanData }: { scanData: any }) => {
 
 const UltrasonicScannerApp: React.FC = () => {
   // Scan data
-  const [currentConfig, setCurrentConfig] = useState(null);
+  const [currentConfig, setCurrentConfig] = useState<JsonConfig>(null);
   const [scanData, setScanData] = useState<any>(null);
   const [devices, setDevices] = useState<RongbukDevice[]>([]);
 
@@ -78,6 +78,8 @@ const UltrasonicScannerApp: React.FC = () => {
     device: RongbukDevice
   ) => {
     console.log('device udpate', device);
+    if (typeof device.location === 'string') return;
+
     setDevices(prevDevices => {
       const index = prevDevices.findIndex(x => x.name === device.name);
       if (index < 0) {
@@ -96,41 +98,6 @@ const UltrasonicScannerApp: React.FC = () => {
     ipcRenderer.on('device-update', handleDeviceUpdate);
     return () => ipcRenderer.off('device-update', handleDeviceUpdate);
   }, []);
-
-  // Mock scan data reception - in real app, this would come from main process
-  // useEffect(() => {
-  //   // Simulate receiving scan data after some time
-  //   const timer = setTimeout(() => {
-  //     const mockScanData = {
-  //       config: {
-  //         name: 'Test Scan',
-  //         numAngles: 3,
-  //         captureStartUs: 50,
-  //         captureEndUs: 200,
-  //         angles: [
-  //           { numSteps: 10, label: '0 degrees' },
-  //           { numSteps: 12, label: '45 degrees' },
-  //           { numSteps: 8, label: '90 degrees' },
-  //         ],
-  //       },
-  //       data: {
-  //         angles: [
-  //           {
-  //             index: 0,
-  //             label: '0 degrees',
-  //             steps: [
-  //               { index: 0, channels: [] },
-  //               { index: 1, channels: [] },
-  //             ],
-  //           },
-  //         ],
-  //       },
-  //     };
-  //     setScanData(mockScanData);
-  //   }, 5000); // Show scan data after 5 seconds
-
-  //   return () => clearTimeout(timer);
-  // }, []);
 
   const onDeviceConnect = (device: RongbukDevice): void => {
     setImmediate(() => ipcRenderer.send('user-connect-device', device));
@@ -162,40 +129,17 @@ const UltrasonicScannerApp: React.FC = () => {
       />
 
       <ControlPanel
-        onConfigChange={(config: JsonConfig) => {
+        disableSumbit={
+          !devices.some(
+            dev =>
+              dev.connectionState === 'CONNECTED' && Array.isArray(dev.location)
+          )
+        }
+        onSubmit={(config: JsonConfig) => {
+          ipcRenderer.send('user-submit-scan-config', config);
           setCurrentConfig(config);
-          // console.log('Configuration updated:', config);
         }}
       />
-
-      {/* Control Panel */}
-      {/* <div
-        style={{
-          marginBottom: '30px',
-          padding: '20px',
-          border: '2px solid #ddd',
-          borderRadius: '8px',
-          backgroundColor: '#fff',
-          minHeight: '150px',
-        }}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
-          Control Panel
-        </h2>
-        <div
-          style={{
-            color: '#666',
-            fontStyle: 'italic',
-            textAlign: 'center',
-            marginTop: '50px',
-          }}
-        >
-          Scan configuration controls will be implemented here.
-          <br />
-          Future features: pattern configuration, angle settings, capture
-          parameters.
-        </div>
-      </div> */}
 
       {/* Scan Results */}
       <div

@@ -38,6 +38,8 @@
   }
  */
 
+import { JsonConfig } from 'src/ControlPanel';
+
 export type ConnectionState =
   | 'CONNECTED'
   | 'DISCONNECTED'
@@ -71,4 +73,6 @@ export interface IPCChannels {
   // browser window tells main process that the user just selected a device to connect
   'user-connect-device': RongbukDevice;
   'user-disconnect-device': RongbukDevice;
+
+  'user-submit-scan-config': JsonConfig;
 }

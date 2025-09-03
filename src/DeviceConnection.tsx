@@ -102,7 +102,7 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
           Rongbuk Devices
         </Typography>
         <Button
-          variant="contained"
+          variant="text"
           size="small"
           onClick={handleRefresh}
           disabled={refreshing}

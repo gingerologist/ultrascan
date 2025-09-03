@@ -30,6 +30,7 @@ import {
   openTestingWindow,
   addTestingMenuToMainWindow,
 } from './testing';
+import { JsonConfig } from './ControlPanel';
 
 const parser = new UltrasonicDataParser();
 
@@ -275,6 +276,13 @@ const createMainWindow = (): void => {
     (event: IpcMainEvent, device: RongbukDevice) => {
       console.log('user-disconnect-device:', device);
       handleDisconnectDevice(device);
+    }
+  );
+
+  ipcMain.on(
+    'user-submit-scan-config',
+    (event: IpcMainEvent, config: JsonConfig) => {
+      console.log('user-submit-scan-config:', config);
     }
   );
 

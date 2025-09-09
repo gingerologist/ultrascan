@@ -1,16 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Button,
-  Popover,
-  Box,
-  Typography,
-} from '@mui/material';
-import {
-  Devices as DevicesIcon,
-  Settings as SettingsIcon,
-} from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, Tabs, Tab, Box } from '@mui/material';
 
 import { RongbukDevice } from './types/devices';
 import { IpcRendererEvent } from 'electron';
@@ -24,16 +13,38 @@ import ScanChart from './ScanChart';
 
 const { ipcRenderer } = window.require('electron');
 
-const UltrasonicScannerApp: React.FC = () => {
-  // Device popup state
-  const [devicesAnchorEl, setDevicesAnchorEl] =
-    useState<HTMLButtonElement | null>(null);
-  const isDevicesPopupOpen = Boolean(devicesAnchorEl);
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
 
-  // Control panel popup state
-  const [controlPanelAnchorEl, setControlPanelAnchorEl] =
-    useState<HTMLButtonElement | null>(null);
-  const isControlPanelPopupOpen = Boolean(controlPanelAnchorEl);
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
+const UltrasonicScannerApp: React.FC = () => {
+  // Tab state
+  const [currentTab, setCurrentTab] = useState(0);
 
   // Scan data
   const [currentConfig, setCurrentConfig] = useState<JsonConfig>(null);
@@ -91,27 +102,9 @@ const UltrasonicScannerApp: React.FC = () => {
     setImmediate(() => ipcRenderer.send('user-refresh-devices'));
   };
 
-  const handleDevicesClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setDevicesAnchorEl(event.currentTarget);
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
   };
-
-  const handleDevicesClose = () => {
-    setDevicesAnchorEl(null);
-  };
-
-  const handleControlPanelClick = (
-    event: React.MouseEvent<HTMLButtonElement>
-  ) => {
-    setControlPanelAnchorEl(event.currentTarget);
-  };
-
-  const handleControlPanelClose = () => {
-    setControlPanelAnchorEl(null);
-  };
-
-  const connectedDeviceCount = devices.filter(
-    dev => dev.connectionState === 'CONNECTED'
-  ).length;
 
   return (
     <div
@@ -134,120 +127,40 @@ const UltrasonicScannerApp: React.FC = () => {
           borderBottom: '1px solid #e0e0e0',
         }}
       >
-        <Toolbar sx={{ minWidth: '800px', justifyContent: 'flex-start' }}>
-          <Button
-            variant="outlined"
-            startIcon={<DevicesIcon />}
-            onClick={handleDevicesClick}
-            sx={{
-              mr: 2,
-              textTransform: 'none',
-              minWidth: '120px',
-            }}
-          >
-            Devices
-            {connectedDeviceCount > 0 && (
-              <Box
-                component="span"
-                sx={{
-                  ml: 1,
-                  px: 1,
-                  py: 0.25,
-                  backgroundColor: 'success.main',
-                  color: 'white',
-                  borderRadius: '10px',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  minWidth: '18px',
-                  textAlign: 'center',
-                }}
-              >
-                {connectedDeviceCount}
-              </Box>
-            )}
-          </Button>
-
-          <Button
-            variant="outlined"
-            startIcon={<SettingsIcon />}
-            onClick={handleControlPanelClick}
-            sx={{
-              mr: 2,
-              textTransform: 'none',
-              minWidth: '140px',
-            }}
-          >
-            Configuration
-          </Button>
-
-          {/* Future toolbar controls can be added here */}
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ ml: 'auto' }}
-          >
-            Ultrasonic Scanner Control
+        <Toolbar sx={{ minWidth: '800px' }}>
+          <Typography variant="h6" color="text.primary" sx={{ flexGrow: 1 }}>
+            Ultrasonic Scanner
           </Typography>
         </Toolbar>
       </AppBar>
 
-      {/* Devices Popup */}
-      <Popover
-        open={isDevicesPopupOpen}
-        anchorEl={devicesAnchorEl}
-        onClose={handleDevicesClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        PaperProps={{
-          sx: {
-            width: '600px',
-            maxWidth: '90vw',
-            maxHeight: '70vh',
-            overflow: 'auto',
-            mt: 1,
-          },
-        }}
-      >
-        <Box sx={{ p: 1 }}>
+      {/* Tab Navigation */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs
+          value={currentTab}
+          onChange={handleTabChange}
+          aria-label="scanner tabs"
+        >
+          <Tab label="Devices" {...a11yProps(0)} />
+          <Tab label="Configuration" {...a11yProps(1)} />
+          <Tab label="Results" {...a11yProps(2)} />
+        </Tabs>
+      </Box>
+
+      {/* Tab Content */}
+      <Box sx={{ flex: 1 }}>
+        {/* Devices Tab */}
+        <TabPanel value={currentTab} index={0}>
           <DeviceConnection
             devices={devices}
             onConnect={onDeviceConnect}
             onDisconnect={onDeviceDisconnect}
             onRefresh={onDeviceRefresh}
           />
-        </Box>
-      </Popover>
+        </TabPanel>
 
-      {/* Control Panel Popup */}
-      <Popover
-        open={isControlPanelPopupOpen}
-        anchorEl={controlPanelAnchorEl}
-        onClose={handleControlPanelClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        PaperProps={{
-          sx: {
-            width: '800px',
-            maxWidth: '95vw',
-            maxHeight: '80vh',
-            overflow: 'auto',
-            mt: 1,
-          },
-        }}
-      >
-        <Box sx={{ p: 1 }}>
+        {/* Configuration Tab */}
+        <TabPanel value={currentTab} index={1}>
           <ControlPanel
             disableSumbit={
               !devices.some(
@@ -259,28 +172,25 @@ const UltrasonicScannerApp: React.FC = () => {
             onSubmit={(config: JsonConfig) => {
               ipcRenderer.send('user-submit-scan-config', config);
               setCurrentConfig(config);
-              handleControlPanelClose(); // Close popup after submit
+              // Switch to Results tab after submitting configuration
+              // setCurrentTab(2);
             }}
           />
-        </Box>
-      </Popover>
+        </TabPanel>
 
-      {/* Main Content */}
-      <Box sx={{ flex: 1, p: 2.5 }}>
-        {/* Scan Results */}
-        <div
-          style={{
-            padding: '20px',
-            border: '2px solid #ddd',
-            borderRadius: '8px',
-            backgroundColor: '#fff',
-          }}
-        >
-          <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
-            Scan Results
-          </h2>
-          <ScanChart scanData={scanData} />
-        </div>
+        {/* Results Tab */}
+        <TabPanel value={currentTab} index={2}>
+          <div
+            style={{
+              padding: '20px',
+              border: '2px solid #ddd',
+              borderRadius: '8px',
+              backgroundColor: '#fff',
+            }}
+          >
+            <ScanChart scanData={scanData} />
+          </div>
+        </TabPanel>
       </Box>
     </div>
   );

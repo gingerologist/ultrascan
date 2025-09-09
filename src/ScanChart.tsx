@@ -60,9 +60,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
 
     const initialOption = {
       title: {
-        text: hasData
-          ? `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex}`
-          : 'Ultrasonic Data - No Scan Data',
+        text: 'Ultrasonic Data',
         left: 'center',
       },
       animation: false,
@@ -184,7 +182,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
       // Show empty chart with default axes
       chartInstance.current.setOption(
         {
-          title: { text: 'Ultrasonic Data - No Scan Data', left: 'center' },
+          title: { text: 'Ultrasonic Data', left: 'center' },
           xAxis: {
             data: Array.from({ length: 40 }, (_, i) => (40 + i).toString()),
           },
@@ -306,64 +304,62 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
   return (
     <Box sx={{ p: 2 }}>
       {/* Controls Section - Only show if we have data */}
-      {hasData && (
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 2,
-              alignItems: 'center',
-              flexWrap: 'wrap',
-            }}
-          >
-            <Box sx={{ minWidth: 200 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Angle</InputLabel>
-                <Select
-                  value={selectedAngleIndex}
-                  label="Angle"
-                  onChange={e => setSelectedAngleIndex(Number(e.target.value))}
-                >
-                  {scanData.angles.map((angle, index) => (
+
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 2,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <Box sx={{ minWidth: 200 }}>
+            <FormControl fullWidth size="small" disabled={!hasData}>
+              <InputLabel>Angle</InputLabel>
+              <Select
+                value={selectedAngleIndex}
+                label="Angle"
+                onChange={e => setSelectedAngleIndex(Number(e.target.value))}
+              >
+                {hasData &&
+                  scanData.angles.map((angle, index) => (
                     <MenuItem key={index} value={index}>
                       {angle.label} ({angle.steps.length} steps)
                     </MenuItem>
                   ))}
-                </Select>
-              </FormControl>
-            </Box>
-
-            <Box sx={{ minWidth: 150 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Step</InputLabel>
-                <Select
-                  value={selectedStepIndex}
-                  label="Step"
-                  onChange={e => setSelectedStepIndex(Number(e.target.value))}
-                >
-                  {availableSteps.map(step => (
-                    <MenuItem key={step.index} value={step.index}>
-                      Step {step.index}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
+              </Select>
+            </FormControl>
           </Box>
-        </Paper>
-      )}
+
+          <Box sx={{ minWidth: 150 }}>
+            <FormControl fullWidth size="small" disabled={!hasData}>
+              <InputLabel>Step</InputLabel>
+              <Select
+                value={selectedStepIndex}
+                label="Step"
+                onChange={e => setSelectedStepIndex(Number(e.target.value))}
+              >
+                {availableSteps.map(step => (
+                  <MenuItem key={step.index} value={step.index}>
+                    Step {step.index}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+      </Paper>
 
       {/* Chart */}
-      <Paper sx={{ p: 1, mb: 2 }}>
-        <Box
-          ref={chartRef}
-          sx={{
-            width: '100%',
-            height: 400,
-            minHeight: 400,
-          }}
-        />
-      </Paper>
+      <Box
+        ref={chartRef}
+        sx={{
+          width: '100%',
+          height: 600,
+          minHeight: 600,
+        }}
+      />
 
       {/* Select All Checkbox - Always visible */}
       <Box sx={{ textAlign: 'center', my: 2 }}>
@@ -377,70 +373,50 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
           }
           label="Select All Channels"
         />
-        <Box sx={{ mt: 1 }}>
-          <Chip
-            label={`Selected: ${selectedChannels.size}/64`}
-            color={
-              isNoneSelected ? 'error' : isSomeSelected ? 'warning' : 'success'
-            }
-            variant="outlined"
-          />
-        </Box>
       </Box>
 
       {/* Channel Selection Grid - Always visible */}
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(16, 1fr)',
-            gridTemplateRows: 'repeat(4, 1fr)',
-            gap: 1,
-            maxWidth: '800px',
-            margin: '0 auto',
-          }}
-        >
-          {Array.from({ length: 64 }, (_, channelIndex) => {
-            const isChecked = selectedChannels.has(channelIndex);
-            return (
-              <FormControlLabel
-                key={channelIndex}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={isChecked}
-                    onChange={e => {
-                      handleChannelToggle(channelIndex, e.target.checked);
-                    }}
-                  />
-                }
-                label={channelIndex.toString()}
-                sx={{
-                  m: 0,
-                  justifyContent: 'center',
-                  '& .MuiFormControlLabel-label': {
-                    fontSize: '0.75rem',
-                    minWidth: '16px',
-                    textAlign: 'center',
-                  },
-                  '& .MuiCheckbox-root': {
-                    padding: '2px',
-                  },
-                }}
-              />
-            );
-          })}
-        </Box>
-      </Paper>
-
-      {/* No Data Message - Only show when no data */}
-      {!hasData && (
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
-            Complete a scan to view channel data and controls
-          </Typography>
-        </Box>
-      )}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(16, 1fr)',
+          gridTemplateRows: 'repeat(4, 1fr)',
+          gap: 1,
+          maxWidth: '800px',
+          margin: '0 auto',
+        }}
+      >
+        {Array.from({ length: 64 }, (_, channelIndex) => {
+          const isChecked = selectedChannels.has(channelIndex);
+          return (
+            <FormControlLabel
+              key={channelIndex}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={isChecked}
+                  onChange={e => {
+                    handleChannelToggle(channelIndex, e.target.checked);
+                  }}
+                />
+              }
+              label={channelIndex.toString()}
+              sx={{
+                m: 0,
+                justifyContent: 'center',
+                '& .MuiFormControlLabel-label': {
+                  fontSize: '0.75rem',
+                  minWidth: '16px',
+                  textAlign: 'center',
+                },
+                '& .MuiCheckbox-root': {
+                  padding: '2px',
+                },
+              }}
+            />
+          );
+        })}
+      </Box>
     </Box>
   );
 };

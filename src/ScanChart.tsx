@@ -5,7 +5,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Button,
   Checkbox,
   FormControlLabel,
   Typography,
@@ -138,7 +137,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
             {
               name: 'No Data',
               type: 'line',
-              data: [],
+              data: [] as number[],
               symbol: 'none',
               lineStyle: {
                 width: 0,
@@ -170,16 +169,8 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
 
   // Update chart when selection changes
   useEffect(() => {
-    if (hasData) {
-      updateChart();
-    }
-  }, [
-    selectedAngleIndex,
-    selectedStepIndex,
-    selectedChannels,
-    scanData,
-    hasData,
-  ]);
+    updateChart();
+  }, [selectedChannels, selectedAngleIndex, selectedStepIndex, scanData]);
 
   const getChannelColor = (channel: number): string => {
     const hue = ((channel * 360) / 64) % 360;
@@ -187,7 +178,24 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
   };
 
   const updateChart = () => {
-    if (!chartInstance.current || !hasData) return;
+    if (!chartInstance.current) return;
+
+    if (!hasData) {
+      // Show empty chart with default axes
+      chartInstance.current.setOption(
+        {
+          title: { text: 'Ultrasonic Data - No Scan Data', left: 'center' },
+          xAxis: {
+            data: Array.from({ length: 40 }, (_, i) => (40 + i).toString()),
+          },
+          series: [],
+        },
+        {
+          replaceMerge: ['series'],
+        }
+      );
+      return;
+    }
 
     const currentAngle = scanData.angles[selectedAngleIndex];
     if (!currentAngle) return;
@@ -195,65 +203,81 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
     const currentStep = currentAngle.steps.find(
       step => step.index === selectedStepIndex
     );
-
     if (!currentStep) {
-      // No data for this step, show empty chart with proper axes
-      chartInstance.current.setOption({
-        title: {
-          text: `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex} (No Data)`,
+      chartInstance.current.setOption(
+        {
+          title: {
+            text: `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex}`,
+            left: 'center',
+          },
+          xAxis: {
+            data: Array.from({ length: 40 }, (_, i) => {
+              const timeUs = 40 + i / 20;
+              return timeUs.toFixed(2);
+            }),
+          },
+          series: [],
         },
-        xAxis: {
-          data: Array.from({ length: 40 }, (_, i) => (40 + i).toString()),
-        },
-        series: [],
-      });
+        {
+          replaceMerge: ['series'],
+        }
+      );
       return;
     }
 
     const series: any[] = [];
     let maxSamples = 0;
-    let channelsWithData = 0;
 
-    // Process selected channels
+    // Only process channels that are selected
     selectedChannels.forEach(channelIndex => {
       const channelData = currentStep.channels.find(
         ch => ch.index === channelIndex
       );
 
-      if (channelData && channelData.samples.length > 0) {
+      if (
+        channelData &&
+        channelData.samples &&
+        channelData.samples.length > 0
+      ) {
         maxSamples = Math.max(maxSamples, channelData.samples.length);
-        channelsWithData++;
 
         series.push({
           name: `Channel ${channelIndex}`,
           type: 'line',
           data: channelData.samples,
           symbol: 'none',
-          lineStyle: {
-            width: 1.5,
-            opacity: 0.8,
-          },
-          itemStyle: {
-            color: getChannelColor(channelIndex),
-          },
+          lineStyle: { width: 1.5, opacity: 0.8 },
+          itemStyle: { color: getChannelColor(channelIndex) },
         });
       }
     });
 
-    // Create time-based x-axis labels (assuming samples represent microseconds from 40 to 40+maxSamples)
-    const xAxisData = Array.from({ length: maxSamples }, (_, i) =>
+    const xAxisData = Array.from({ length: maxSamples || 40 }, (_, i) =>
       (40 + i).toString()
     );
 
-    chartInstance.current.setOption({
-      title: {
-        text: `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex} (${channelsWithData}/${selectedChannels.size} selected)`,
+    console.log('=== ECHARTS DEBUG INFO ===');
+    console.log('selectedChannels Set size:', selectedChannels.size);
+    console.log('selectedChannels contents:', Array.from(selectedChannels));
+    console.log('series array length:', series.length);
+    console.log('series array contents:', series);
+    console.log('maxSamples:', maxSamples);
+    console.log('xAxisData length:', xAxisData.length);
+    console.log('=== END ECHARTS DEBUG ===');
+
+    chartInstance.current.setOption(
+      {
+        title: {
+          text: `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex}`,
+          left: 'center',
+        },
+        xAxis: { data: xAxisData },
+        series: series,
       },
-      xAxis: {
-        data: xAxisData,
-      },
-      series: series,
-    });
+      {
+        replaceMerge: ['series'],
+      }
+    );
   };
 
   const handleChannelToggle = (channel: number, checked: boolean) => {
@@ -325,88 +349,12 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
                 </Select>
               </FormControl>
             </Box>
-
-            <Button
-              variant="contained"
-              onClick={updateChart}
-              size="small"
-              sx={{ minWidth: 120 }}
-            >
-              Update Chart
-            </Button>
-
-            <Chip
-              label={`Selected: ${selectedChannels.size}/64`}
-              color={
-                isNoneSelected
-                  ? 'error'
-                  : isSomeSelected
-                  ? 'warning'
-                  : 'success'
-              }
-              variant="outlined"
-            />
-          </Box>
-        </Paper>
-      )}
-
-      {/* Channel Selection - Only show if we have data */}
-      {hasData && (
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Channel Selection
-          </Typography>
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={isAllSelected}
-                indeterminate={isSomeSelected}
-                onChange={e => handleCheckAll(e.target.checked)}
-              />
-            }
-            label="Select All Channels"
-            sx={{ mb: 1 }}
-          />
-
-          <Box
-            sx={{
-              maxHeight: 200,
-              overflow: 'auto',
-              border: '1px solid #ddd',
-              borderRadius: 1,
-              p: 1,
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 0.5,
-            }}
-          >
-            {Array.from({ length: 64 }, (_, i) => (
-              <Box key={i} sx={{ minWidth: '90px' }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={selectedChannels.has(i)}
-                      onChange={e => handleChannelToggle(i, e.target.checked)}
-                    />
-                  }
-                  label={`CH${i}`}
-                  sx={{
-                    m: 0,
-                    '& .MuiFormControlLabel-label': {
-                      fontSize: '0.75rem',
-                    },
-                  }}
-                />
-              </Box>
-            ))}
           </Box>
         </Paper>
       )}
 
       {/* Chart */}
-      <Paper sx={{ p: 1 }}>
+      <Paper sx={{ p: 1, mb: 2 }}>
         <Box
           ref={chartRef}
           sx={{
@@ -417,9 +365,77 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
         />
       </Paper>
 
-      {/* No Data Message */}
+      {/* Select All Checkbox - Always visible */}
+      <Box sx={{ textAlign: 'center', my: 2 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={isAllSelected}
+              indeterminate={isSomeSelected}
+              onChange={e => handleCheckAll(e.target.checked)}
+            />
+          }
+          label="Select All Channels"
+        />
+        <Box sx={{ mt: 1 }}>
+          <Chip
+            label={`Selected: ${selectedChannels.size}/64`}
+            color={
+              isNoneSelected ? 'error' : isSomeSelected ? 'warning' : 'success'
+            }
+            variant="outlined"
+          />
+        </Box>
+      </Box>
+
+      {/* Channel Selection Grid - Always visible */}
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(16, 1fr)',
+            gridTemplateRows: 'repeat(4, 1fr)',
+            gap: 1,
+            maxWidth: '800px',
+            margin: '0 auto',
+          }}
+        >
+          {Array.from({ length: 64 }, (_, channelIndex) => {
+            const isChecked = selectedChannels.has(channelIndex);
+            return (
+              <FormControlLabel
+                key={channelIndex}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={isChecked}
+                    onChange={e => {
+                      handleChannelToggle(channelIndex, e.target.checked);
+                    }}
+                  />
+                }
+                label={channelIndex.toString()}
+                sx={{
+                  m: 0,
+                  justifyContent: 'center',
+                  '& .MuiFormControlLabel-label': {
+                    fontSize: '0.75rem',
+                    minWidth: '16px',
+                    textAlign: 'center',
+                  },
+                  '& .MuiCheckbox-root': {
+                    padding: '2px',
+                  },
+                }}
+              />
+            );
+          })}
+        </Box>
+      </Paper>
+
+      {/* No Data Message - Only show when no data */}
       {!hasData && (
-        <Box sx={{ textAlign: 'center', mt: 2 }}>
+        <Box sx={{ textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
             Complete a scan to view channel data and controls
           </Typography>

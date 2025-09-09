@@ -15,28 +15,25 @@ import { SerialPort } from 'serialport';
 
 import type { ConnectionState, RongbukDevice } from './types/devices';
 
-import {
-  UltrasonicDataParser,
-  MetadataPacket,
-  DataPacket,
-  ScanData,
-} from './parser';
+import { UltrasonicDataParser } from './parser';
+import type { CompleteScanData } from './parser';
 
 import { error } from 'console';
 import discoverDevices from './discover-devices';
 
-import {
-  createTestingWindow,
-  openTestingWindow,
-  addTestingMenuToMainWindow,
-} from './testing';
 import { JsonConfig } from './ControlPanel';
 
 const parser = new UltrasonicDataParser();
 
-parser.onDataPacketReceived = () => console.log('data packet arrived');
-parser.onMetadataReceived = () => console.log('meta packet received');
-parser.onScanComplete = () => console.log('scan complete');
+// parser.onDataPacketReceived = () => console.log('data packet arrived');
+// parser.onMetadataReceived = () => console.log('meta packet received');
+parser.onScanComplete = (data: CompleteScanData) => {
+  console.log('scan complete', data);
+  if (mainWindow) {
+    mainWindow.webContents.send('device-scandata', data);
+  }
+};
+
 parser.onParseError = () => console.log('parser error');
 
 // Send data through current connection
@@ -155,7 +152,7 @@ const handleConnectDevice = (device: RongbukDevice | null) => {
         clearTimeout(timer);
       }
       timer = setTimeout(() => {
-        console.log(`received ${received} bytes`);
+        console.log(`[index.ts] received ${received} bytes`);
         timer = null;
       }, 5000);
     });
@@ -218,40 +215,6 @@ const createMainWindow = (): void => {
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
   // mainWindow.webContents.openDevTools();
 
-  // const menuTemplate: MenuItemConstructorOptions[] = [
-  //   { role: 'fileMenu' },
-  //   { role: 'editMenu' },
-  //   { role: 'viewMenu' },
-  //   {
-  //     label: 'Test',
-  //     submenu: [
-  //       {
-  //         label: 'foo',
-  //         click: () => {
-  //           dialog.showMessageBox(mainWindow, {
-  //             message: 'You clicked foo',
-  //             type: 'info',
-  //           });
-  //         },
-  //       },
-  //       {
-  //         label: 'bar',
-  //         click: () => {
-  //           dialog.showMessageBox(mainWindow, {
-  //             message: 'You clicked bar',
-  //             type: 'info',
-  //           });
-  //         },
-  //       },
-  //     ],
-  //   },
-  //   { role: 'windowMenu' },
-  // ];
-
-  // const menu = Menu.buildFromTemplate(menuTemplate);
-  // Menu.setApplicationMenu(menu);
-  // addTestingMenuToMainWindow(mainWindow);
-
   ipcMain.on('user-refresh-devices', () => {
     discoverDevices(device => {
       if (currentDevice !== null) {
@@ -283,6 +246,19 @@ const createMainWindow = (): void => {
     'user-submit-scan-config',
     (event: IpcMainEvent, config: JsonConfig) => {
       console.log('user-submit-scan-config:', config);
+
+      if (currentSocket) {
+        const request = JSON.stringify(config) + '\n';
+        currentSocket.write(request, err => {
+          if (err) {
+            console.log(err);
+          } else {
+            console.log(request);
+          }
+        });
+      } else {
+        console.log('no socket');
+      }
     }
   );
 

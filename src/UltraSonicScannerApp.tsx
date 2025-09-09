@@ -4,68 +4,70 @@ import { RongbukDevice } from './types/devices';
 import { IpcRendererEvent } from 'electron';
 
 import DeviceConnection from './DeviceConnection';
-import type { ScanConfig } from './parser';
+import type { CompleteScanData, ScanConfig } from './parser';
 import ControlPanel from './ControlPanel';
 import type { JsonConfig } from './ControlPanel';
 
+import ScanChart from './ScanChart';
+
 const { ipcRenderer } = window.require('electron');
 // Mock ScanChart component - replace with your actual import
-const ScanChart = ({ scanData }: { scanData: any }) => {
-  if (!scanData) {
-    return (
-      <div
-        style={{
-          width: '100%',
-          height: '400px',
-          border: '2px dashed #ddd',
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f9f9f9',
-          color: '#666',
-        }}
-      >
-        No scan data available - waiting for scan completion
-      </div>
-    );
-  }
+// const ScanChart = ({ scanData }: { scanData: any }) => {
+//   if (!scanData) {
+//     return (
+//       <div
+//         style={{
+//           width: '100%',
+//           height: '400px',
+//           border: '2px dashed #ddd',
+//           borderRadius: '8px',
+//           display: 'flex',
+//           alignItems: 'center',
+//           justifyContent: 'center',
+//           backgroundColor: '#f9f9f9',
+//           color: '#666',
+//         }}
+//       >
+//         No scan data available - waiting for scan completion
+//       </div>
+//     );
+//   }
 
-  return (
-    <div
-      style={{
-        width: '100%',
-        height: '400px',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '20px',
-        backgroundColor: '#fff',
-      }}
-    >
-      <h3>Scan Results</h3>
-      <p>
-        <strong>Scan Name:</strong> {scanData.config?.name || 'Unknown'}
-      </p>
-      <p>
-        <strong>Angles:</strong> {scanData.config?.numAngles || 0}
-      </p>
-      <p>
-        <strong>Data Points:</strong> {scanData.data?.angles?.length || 0}{' '}
-        angles
-      </p>
-      <div
-        style={{
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#e7f3ff',
-          borderRadius: '4px',
-        }}
-      >
-        Chart visualization would appear here (import your ScanChart component)
-      </div>
-    </div>
-  );
-};
+//   return (
+//     <div
+//       style={{
+//         width: '100%',
+//         height: '400px',
+//         border: '1px solid #ddd',
+//         borderRadius: '8px',
+//         padding: '20px',
+//         backgroundColor: '#fff',
+//       }}
+//     >
+//       <h3>Scan Results</h3>
+//       <p>
+//         <strong>Scan Name:</strong> {scanData.config?.name || 'Unknown'}
+//       </p>
+//       <p>
+//         <strong>Angles:</strong> {scanData.config?.numAngles || 0}
+//       </p>
+//       <p>
+//         <strong>Data Points:</strong> {scanData.data?.angles?.length || 0}{' '}
+//         angles
+//       </p>
+//       <div
+//         style={{
+//           marginTop: '20px',
+//           padding: '15px',
+//           backgroundColor: '#e7f3ff',
+//           borderRadius: '4px',
+//         }}
+//       >
+//         Chart visualization would appear here (import your ScanChart component)
+//       </div>
+//     </div>
+//   );
+// };
 
 const UltrasonicScannerApp: React.FC = () => {
   // Scan data
@@ -94,9 +96,21 @@ const UltrasonicScannerApp: React.FC = () => {
     });
   };
 
+  const handleDeviceScanData = (
+    event: IpcRendererEvent,
+    data: CompleteScanData
+  ) => {
+    console.log('scandata', data);
+    setScanData(data);
+  };
+
   useEffect(() => {
     ipcRenderer.on('device-update', handleDeviceUpdate);
-    return () => ipcRenderer.off('device-update', handleDeviceUpdate);
+    ipcRenderer.on('device-scandata', handleDeviceScanData);
+    return () => {
+      ipcRenderer.off('device-update', handleDeviceUpdate);
+      ipcRenderer.off('device-scandata', handleDeviceScanData);
+    };
   }, []);
 
   const onDeviceConnect = (device: RongbukDevice): void => {

@@ -39,6 +39,7 @@
  */
 
 import { JsonConfig } from 'src/ControlPanel';
+import { CompleteScanData } from 'src/parser';
 
 export type ConnectionState =
   | 'CONNECTED'
@@ -75,4 +76,6 @@ export interface IPCChannels {
   'user-disconnect-device': RongbukDevice;
 
   'user-submit-scan-config': JsonConfig;
+
+  'device-scandata': CompleteScanData;
 }

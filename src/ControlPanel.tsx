@@ -37,7 +37,7 @@ export interface JsonConfig {
   version: string;
   name: string;
   angles: JsonAngle[];
-  patterns: JsonPatternSegment[];
+  pattern: JsonPatternSegment[];
   repeat: number;
   tail: number;
   startUs: number;
@@ -106,7 +106,7 @@ const defaultConfig: JsonConfig = {
   version: '1.0',
   name: '',
   angles: [{ degree: 0, masks: [0] }],
-  patterns: [
+  pattern: [
     [5, 2],
     [5, 1],
   ],
@@ -265,7 +265,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
 
     updateConfig({
       angles: newAngles,
-      patterns: newPatterns,
+      pattern: newPatterns,
     });
   }, [
     committedAngleRange,

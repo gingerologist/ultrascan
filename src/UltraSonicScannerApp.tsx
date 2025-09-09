@@ -1,4 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  Button,
+  Popover,
+  Box,
+  Typography,
+} from '@mui/material';
+import { Devices as DevicesIcon } from '@mui/icons-material';
 
 import { RongbukDevice } from './types/devices';
 import { IpcRendererEvent } from 'electron';
@@ -11,65 +20,13 @@ import type { JsonConfig } from './ControlPanel';
 import ScanChart from './ScanChart';
 
 const { ipcRenderer } = window.require('electron');
-// Mock ScanChart component - replace with your actual import
-// const ScanChart = ({ scanData }: { scanData: any }) => {
-//   if (!scanData) {
-//     return (
-//       <div
-//         style={{
-//           width: '100%',
-//           height: '400px',
-//           border: '2px dashed #ddd',
-//           borderRadius: '8px',
-//           display: 'flex',
-//           alignItems: 'center',
-//           justifyContent: 'center',
-//           backgroundColor: '#f9f9f9',
-//           color: '#666',
-//         }}
-//       >
-//         No scan data available - waiting for scan completion
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div
-//       style={{
-//         width: '100%',
-//         height: '400px',
-//         border: '1px solid #ddd',
-//         borderRadius: '8px',
-//         padding: '20px',
-//         backgroundColor: '#fff',
-//       }}
-//     >
-//       <h3>Scan Results</h3>
-//       <p>
-//         <strong>Scan Name:</strong> {scanData.config?.name || 'Unknown'}
-//       </p>
-//       <p>
-//         <strong>Angles:</strong> {scanData.config?.numAngles || 0}
-//       </p>
-//       <p>
-//         <strong>Data Points:</strong> {scanData.data?.angles?.length || 0}{' '}
-//         angles
-//       </p>
-//       <div
-//         style={{
-//           marginTop: '20px',
-//           padding: '15px',
-//           backgroundColor: '#e7f3ff',
-//           borderRadius: '4px',
-//         }}
-//       >
-//         Chart visualization would appear here (import your ScanChart component)
-//       </div>
-//     </div>
-//   );
-// };
 
 const UltrasonicScannerApp: React.FC = () => {
+  // Device popup state
+  const [devicesAnchorEl, setDevicesAnchorEl] =
+    useState<HTMLButtonElement | null>(null);
+  const isDevicesPopupOpen = Boolean(devicesAnchorEl);
+
   // Scan data
   const [currentConfig, setCurrentConfig] = useState<JsonConfig>(null);
   const [scanData, setScanData] = useState<any>(null);
@@ -125,50 +82,148 @@ const UltrasonicScannerApp: React.FC = () => {
     setDevices([]);
     setImmediate(() => ipcRenderer.send('user-refresh-devices'));
   };
+
+  const handleDevicesClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setDevicesAnchorEl(event.currentTarget);
+  };
+
+  const handleDevicesClose = () => {
+    setDevicesAnchorEl(null);
+  };
+
+  const connectedDeviceCount = devices.filter(
+    dev => dev.connectionState === 'CONNECTED'
+  ).length;
+
   return (
     <div
       style={{
         fontFamily: 'Arial, sans-serif',
         maxWidth: '1200px',
-        margin: '20px auto',
-        padding: '20px',
+        margin: '0 auto',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      {/* Device Connection */}
-      <DeviceConnection
-        devices={devices}
-        onConnect={onDeviceConnect}
-        onDisconnect={onDeviceDisconnect}
-        onRefresh={onDeviceRefresh}
-      />
-
-      <ControlPanel
-        disableSumbit={
-          !devices.some(
-            dev =>
-              dev.connectionState === 'CONNECTED' && Array.isArray(dev.location)
-          )
-        }
-        onSubmit={(config: JsonConfig) => {
-          ipcRenderer.send('user-submit-scan-config', config);
-          setCurrentConfig(config);
-        }}
-      />
-
-      {/* Scan Results */}
-      <div
-        style={{
-          padding: '20px',
-          border: '2px solid #ddd',
-          borderRadius: '8px',
-          backgroundColor: '#fff',
+      {/* Top Toolbar */}
+      <AppBar
+        position="static"
+        color="default"
+        elevation={1}
+        sx={{
+          backgroundColor: '#f5f5f5',
+          borderBottom: '1px solid #e0e0e0',
         }}
       >
-        <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
-          Scan Results
-        </h2>
-        <ScanChart scanData={scanData} />
-      </div>
+        <Toolbar sx={{ minWidth: '800px', justifyContent: 'flex-start' }}>
+          <Button
+            variant="outlined"
+            startIcon={<DevicesIcon />}
+            onClick={handleDevicesClick}
+            sx={{
+              mr: 2,
+              textTransform: 'none',
+              minWidth: '120px',
+            }}
+          >
+            Devices
+            {connectedDeviceCount > 0 && (
+              <Box
+                component="span"
+                sx={{
+                  ml: 1,
+                  px: 1,
+                  py: 0.25,
+                  backgroundColor: 'success.main',
+                  color: 'white',
+                  borderRadius: '10px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  minWidth: '18px',
+                  textAlign: 'center',
+                }}
+              >
+                {connectedDeviceCount}
+              </Box>
+            )}
+          </Button>
+
+          {/* Future toolbar controls can be added here */}
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ ml: 'auto' }}
+          >
+            Ultrasonic Scanner Control
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {/* Devices Popup */}
+      <Popover
+        open={isDevicesPopupOpen}
+        anchorEl={devicesAnchorEl}
+        onClose={handleDevicesClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        PaperProps={{
+          sx: {
+            width: '600px',
+            maxWidth: '90vw',
+            maxHeight: '70vh',
+            overflow: 'auto',
+            mt: 1,
+          },
+        }}
+      >
+        <Box sx={{ p: 1 }}>
+          <DeviceConnection
+            devices={devices}
+            onConnect={onDeviceConnect}
+            onDisconnect={onDeviceDisconnect}
+            onRefresh={onDeviceRefresh}
+          />
+        </Box>
+      </Popover>
+
+      {/* Main Content */}
+      <Box sx={{ flex: 1, p: 2.5 }}>
+        <ControlPanel
+          disableSumbit={
+            !devices.some(
+              dev =>
+                dev.connectionState === 'CONNECTED' &&
+                Array.isArray(dev.location)
+            )
+          }
+          onSubmit={(config: JsonConfig) => {
+            ipcRenderer.send('user-submit-scan-config', config);
+            setCurrentConfig(config);
+          }}
+        />
+
+        {/* Scan Results */}
+        <div
+          style={{
+            padding: '20px',
+            border: '2px solid #ddd',
+            borderRadius: '8px',
+            backgroundColor: '#fff',
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
+            Scan Results
+          </h2>
+          <ScanChart scanData={scanData} />
+        </div>
+      </Box>
     </div>
   );
 };

@@ -7,7 +7,10 @@ import {
   Box,
   Typography,
 } from '@mui/material';
-import { Devices as DevicesIcon } from '@mui/icons-material';
+import {
+  Devices as DevicesIcon,
+  Settings as SettingsIcon,
+} from '@mui/icons-material';
 
 import { RongbukDevice } from './types/devices';
 import { IpcRendererEvent } from 'electron';
@@ -26,6 +29,11 @@ const UltrasonicScannerApp: React.FC = () => {
   const [devicesAnchorEl, setDevicesAnchorEl] =
     useState<HTMLButtonElement | null>(null);
   const isDevicesPopupOpen = Boolean(devicesAnchorEl);
+
+  // Control panel popup state
+  const [controlPanelAnchorEl, setControlPanelAnchorEl] =
+    useState<HTMLButtonElement | null>(null);
+  const isControlPanelPopupOpen = Boolean(controlPanelAnchorEl);
 
   // Scan data
   const [currentConfig, setCurrentConfig] = useState<JsonConfig>(null);
@@ -91,6 +99,16 @@ const UltrasonicScannerApp: React.FC = () => {
     setDevicesAnchorEl(null);
   };
 
+  const handleControlPanelClick = (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    setControlPanelAnchorEl(event.currentTarget);
+  };
+
+  const handleControlPanelClose = () => {
+    setControlPanelAnchorEl(null);
+  };
+
   const connectedDeviceCount = devices.filter(
     dev => dev.connectionState === 'CONNECTED'
   ).length;
@@ -149,6 +167,19 @@ const UltrasonicScannerApp: React.FC = () => {
             )}
           </Button>
 
+          <Button
+            variant="outlined"
+            startIcon={<SettingsIcon />}
+            onClick={handleControlPanelClick}
+            sx={{
+              mr: 2,
+              textTransform: 'none',
+              minWidth: '140px',
+            }}
+          >
+            Configuration
+          </Button>
+
           {/* Future toolbar controls can be added here */}
           <Typography
             variant="body2"
@@ -193,22 +224,49 @@ const UltrasonicScannerApp: React.FC = () => {
         </Box>
       </Popover>
 
+      {/* Control Panel Popup */}
+      <Popover
+        open={isControlPanelPopupOpen}
+        anchorEl={controlPanelAnchorEl}
+        onClose={handleControlPanelClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        PaperProps={{
+          sx: {
+            width: '800px',
+            maxWidth: '95vw',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            mt: 1,
+          },
+        }}
+      >
+        <Box sx={{ p: 1 }}>
+          <ControlPanel
+            disableSumbit={
+              !devices.some(
+                dev =>
+                  dev.connectionState === 'CONNECTED' &&
+                  Array.isArray(dev.location)
+              )
+            }
+            onSubmit={(config: JsonConfig) => {
+              ipcRenderer.send('user-submit-scan-config', config);
+              setCurrentConfig(config);
+              handleControlPanelClose(); // Close popup after submit
+            }}
+          />
+        </Box>
+      </Popover>
+
       {/* Main Content */}
       <Box sx={{ flex: 1, p: 2.5 }}>
-        <ControlPanel
-          disableSumbit={
-            !devices.some(
-              dev =>
-                dev.connectionState === 'CONNECTED' &&
-                Array.isArray(dev.location)
-            )
-          }
-          onSubmit={(config: JsonConfig) => {
-            ipcRenderer.send('user-submit-scan-config', config);
-            setCurrentConfig(config);
-          }}
-        />
-
         {/* Scan Results */}
         <div
           style={{

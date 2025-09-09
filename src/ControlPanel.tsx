@@ -375,15 +375,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   );
 
   return (
-    <Paper
-      elevation={1}
-      sx={{
-        p: 3,
-        mb: 4,
-        border: '1px solid',
-        borderColor: 'grey.200',
-      }}
-    >
+    <Box p={3} mb={4}>
       {/* Header */}
       <Box
         display="flex"
@@ -596,7 +588,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
           </TableRow>
         </TableBody>
       </Table>
-    </Paper>
+    </Box>
   );
 };
 

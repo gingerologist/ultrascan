@@ -180,16 +180,9 @@ const UltrasonicScannerApp: React.FC = () => {
 
         {/* Results Tab */}
         <TabPanel value={currentTab} index={2}>
-          <div
-            style={{
-              padding: '20px',
-              border: '2px solid #ddd',
-              borderRadius: '8px',
-              backgroundColor: '#fff',
-            }}
-          >
+          <Box>
             <ScanChart scanData={scanData} />
-          </div>
+          </Box>
         </TabPanel>
       </Box>
     </div>

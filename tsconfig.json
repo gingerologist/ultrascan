@@ -1,10 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES6",
-    "lib": [
-      "ES6",
-      "DOM"
-    ],
+    "lib": ["ES6", "DOM"],
     "allowJs": true,
     "module": "commonjs",
     "skipLibCheck": true,
@@ -18,15 +15,9 @@
     "resolveJsonModule": true,
     "jsx": "react-jsx",
     "paths": {
-      "*": [
-        "node_modules/*"
-      ]
+      "*": ["*", "src/*", "node_modules/*"]
     }
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "tests/**/*"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["tests/**/*"]
 }

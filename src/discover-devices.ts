@@ -1,4 +1,4 @@
-import { SerialPort } from 'serialport';
+// import { SerialPort } from 'serialport';
 import * as Bonjour from 'bonjour';
 
 import type { RongbukDevice } from './types/devices';
@@ -6,6 +6,7 @@ import type { RongbukDevice } from './types/devices';
 const bonjour = Bonjour.default({ interface: '0.0.0.0' }); // interface setting important!
 
 export default (callback: (device: RongbukDevice) => void): void => {
+  console.log('discover-devices');
   bonjour.find(
     {
       type: 'sonic',
@@ -25,22 +26,22 @@ export default (callback: (device: RongbukDevice) => void): void => {
     }
   );
 
-  SerialPort.list()
-    .then(ports => {
-      console.log('SerialPort.list()', ports);
+  // SerialPort.list()
+  //   .then(ports => {
+  //     console.log('SerialPort.list()', ports);
 
-      ports.forEach(port => {
-        // @ts-ignore
-        const device: RongbukDevice = {
-          connectionState: 'DISCONNECTED',
-          // @ts-ignore
-          name: port.friendlyName || port.path,
-          location: port.path,
-        };
+  //     ports.forEach(port => {
+  //       // @ts-ignore
+  //       const device: RongbukDevice = {
+  //         connectionState: 'DISCONNECTED',
+  //         // @ts-ignore
+  //         name: port.friendlyName || port.path,
+  //         location: port.path,
+  //       };
 
-        // Send to devices window
-        callback(device);
-      });
-    })
-    .catch(e => console.log('[discover-devices] SerialPort.list()', e));
+  //       // Send to devices window
+  //       callback(device);
+  //     });
+  //   })
+  //   .catch(e => console.log('[discover-devices] SerialPort.list()', e));
 };

@@ -153,11 +153,11 @@ const UltrasonicScannerApp: React.FC = () => {
           <Tab label="Configuration" {...a11yProps(1)} />
           <Tab label="Results" {...a11yProps(2)} />
         </Tabs>
-        {currentTab == 0 && <Button>Refresh</Button>}
+        {/* {currentTab == 0 && <Button>Refresh</Button>}
         {currentTab == 1 && <Button>Reset</Button>}
         {currentTab == 1 && <Button>Submit</Button>}
         {currentTab == 2 && <FormLabel>X</FormLabel>}
-        {currentTab == 2 && <FormLabel>Y</FormLabel>}
+        {currentTab == 2 && <FormLabel>Y</FormLabel>} */}
       </Box>
 
       {/* Tab Content */}

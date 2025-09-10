@@ -11,7 +11,8 @@ import {
 } from 'electron';
 
 import * as net from 'net';
-import { SerialPort } from 'serialport';
+
+// import { SerialPort } from 'serialport';
 
 import type { ConnectionState, RongbukDevice } from './types/devices';
 
@@ -63,13 +64,13 @@ parser.onParseError = () => console.log('parser error');
 // }
 
 // Handle incoming data (unified for both connection types)
-function handleIncomingData(data: Buffer) {
-  // Process the data regardless of source
-  console.log('Processing data:', data.toString());
+// function handleIncomingData(data: Buffer) {
+//   // Process the data regardless of source
+//   console.log('Processing data:', data.toString());
 
-  // Send to main window if needed
-  mainWindow?.webContents.send('device-data', data.toString());
-}
+//   // Send to main window if needed
+//   mainWindow?.webContents.send('device-data', data.toString());
+// }
 
 // Disconnect current device
 // function disconnectCurrentDevice(): void {
@@ -106,7 +107,7 @@ if (require('electron-squirrel-startup')) {
 let mainWindow: BrowserWindow | null = null;
 let currentDevice: RongbukDevice | null = null;
 let currentSocket: net.Socket | null = null;
-let currentPort: SerialPort | null = null;
+// let currentPort: SerialPort | null = null;
 
 const handleConnectDevice = (device: RongbukDevice | null) => {
   if (device === null) return;
@@ -117,15 +118,15 @@ const handleConnectDevice = (device: RongbukDevice | null) => {
   }
 
   if (typeof device.location == 'string') {
-    // com port
-    currentPort = new SerialPort({
-      path: device.location,
-      baudRate: 115200,
-    });
-    currentPort.on('open', () => {});
-    currentPort.on('data', data => {});
-    currentPort.on('close', () => {});
-    currentPort.on('error', err => {}); // there is .isOpen to differentiate
+    // // com port
+    // currentPort = new SerialPort({
+    //   path: device.location,
+    //   baudRate: 115200,
+    // });
+    // currentPort.on('open', () => {});
+    // currentPort.on('data', data => {});
+    // currentPort.on('close', () => {});
+    // currentPort.on('error', err => {}); // there is .isOpen to differentiate
   } else {
     currentDevice = device;
     currentDevice.connectionState = 'DISCONNECTED';
@@ -216,6 +217,7 @@ const createMainWindow = (): void => {
   // mainWindow.webContents.openDevTools();
 
   ipcMain.on('user-refresh-devices', () => {
+    console.log('user-refresh-devices');
     discoverDevices(device => {
       if (currentDevice !== null) {
         if (currentDevice.name === device.name) {

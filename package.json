@@ -73,8 +73,6 @@
     "lucide-react": "^0.542.0",
     "passive-events-support": "^1.1.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "serialport": "^13.0.0",
-    "vanilla-jsoneditor": "^3.8.0"
+    "react-dom": "^19.1.1"
   }
 }

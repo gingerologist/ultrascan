@@ -10,6 +10,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Toolbar,
   Stack,
   CircularProgress,
 } from '@mui/material';
@@ -82,27 +83,16 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
   };
 
   return (
-    <Paper
-      elevation={2}
-      sx={{
-        p: 3,
-        mb: 4,
-        border: '2px solid',
-        borderColor: 'grey.200',
-      }}
-    >
+    <Box mt={2}>
       {/* Header */}
-      <Box
+      {/* <Box
         display="flex"
         justifyContent="space-between"
         alignItems="center"
         mb={3}
-      >
-        <Typography variant="h5" color="text.secondary" fontWeight="medium">
-          Rongbuk Devices
-        </Typography>
+      > */}
+      <Toolbar>
         <Button
-          variant="text"
           size="small"
           onClick={handleRefresh}
           disabled={refreshing}
@@ -116,14 +106,11 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
         >
           {refreshing ? 'Refreshing...' : 'Refresh'}
         </Button>
-      </Box>
+        {/* </Box> */}
+      </Toolbar>
 
       {/* Device Table */}
-      <TableContainer
-        component={Paper}
-        variant="outlined"
-        sx={{ borderRadius: 2 }}
-      >
+      <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
         <Table size="medium">
           <TableHead sx={{ bgcolor: 'grey.50' }}>
             <TableRow>
@@ -277,7 +264,7 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
           {devices.length} device{devices.length !== 1 ? 's' : ''} found
         </Typography>
       )}
-    </Paper>
+    </Box>
   );
 };
 

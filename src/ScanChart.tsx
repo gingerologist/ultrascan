@@ -9,7 +9,6 @@ import {
   FormControlLabel,
   Typography,
   Paper,
-  Chip,
 } from '@mui/material';
 import * as echarts from 'echarts';
 import { CompleteScanData } from './parser';
@@ -18,6 +17,10 @@ interface ScanChartProps {
   scanData: CompleteScanData;
 }
 
+const initXAxisData: string[] = Array.from({ length: 40 }, (_, i) =>
+  i.toString()
+);
+
 const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
   // Selection state
   const [selectedAngleIndex, setSelectedAngleIndex] = useState(0);
@@ -25,6 +28,8 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
   const [selectedChannels, setSelectedChannels] = useState<Set<number>>(
     () => new Set(Array.from({ length: 64 }, (_, i) => i))
   );
+
+  const [xAxisData, setxAxisData] = useState<string[]>(initXAxisData);
 
   // Chart reference
   const chartRef = useRef<HTMLDivElement>(null);
@@ -64,6 +69,9 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
         left: 'center',
       },
       animation: false,
+      animationDuration: 0,
+      useGPUTranslucency: true,
+      progressive: 2000,
       tooltip: {
         trigger: 'axis',
         axisPointer: {
@@ -104,9 +112,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
         name: 'Time (μs)',
         nameLocation: 'middle',
         nameGap: 30,
-        data: hasData
-          ? []
-          : Array.from({ length: 40 }, (_, i) => (40 + i).toString()),
+        data: xAxisData,
       },
       yAxis: {
         type: 'value',
@@ -185,6 +191,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
           title: { text: 'Ultrasonic Data', left: 'center' },
           xAxis: {
             data: Array.from({ length: 40 }, (_, i) => (40 + i).toString()),
+            // data: Array.from({ length: 100 }, (_, i) => i.toString()),
           },
           series: [],
         },
@@ -253,15 +260,6 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
     const xAxisData = Array.from({ length: maxSamples || 40 }, (_, i) =>
       (40 + i).toString()
     );
-
-    console.log('=== ECHARTS DEBUG INFO ===');
-    console.log('selectedChannels Set size:', selectedChannels.size);
-    console.log('selectedChannels contents:', Array.from(selectedChannels));
-    console.log('series array length:', series.length);
-    console.log('series array contents:', series);
-    console.log('maxSamples:', maxSamples);
-    console.log('xAxisData length:', xAxisData.length);
-    console.log('=== END ECHARTS DEBUG ===');
 
     chartInstance.current.setOption(
       {

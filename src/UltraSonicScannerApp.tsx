@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppBar, Toolbar, Typography, Tabs, Tab, Box } from '@mui/material';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Tabs,
+  Tab,
+  Box,
+  Button,
+  FormLabel,
+} from '@mui/material';
 
 import { RongbukDevice } from './types/devices';
 import { IpcRendererEvent } from 'electron';
@@ -118,33 +127,37 @@ const UltrasonicScannerApp: React.FC = () => {
       }}
     >
       {/* Top Toolbar */}
-      <AppBar
-        position="static"
-        color="default"
-        elevation={1}
-        sx={{
-          backgroundColor: '#f5f5f5',
-          borderBottom: '1px solid #e0e0e0',
-        }}
-      >
-        <Toolbar sx={{ minWidth: '800px' }}>
-          <Typography variant="h6" color="text.primary" sx={{ flexGrow: 1 }}>
-            Ultrasonic Scanner
-          </Typography>
+      <AppBar elevation={1}>
+        <Toolbar sx={{ justifyContent: 'center' }}>
+          <Typography variant="h5">Project Rongbuk</Typography>
         </Toolbar>
       </AppBar>
 
       {/* Tab Navigation */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Box
+        sx={{
+          borderBottom: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+        }}
+        mt={5}
+      >
         <Tabs
           value={currentTab}
           onChange={handleTabChange}
           aria-label="scanner tabs"
+          sx={{ flexGrow: 1 }}
         >
           <Tab label="Devices" {...a11yProps(0)} />
           <Tab label="Configuration" {...a11yProps(1)} />
           <Tab label="Results" {...a11yProps(2)} />
         </Tabs>
+        {currentTab == 0 && <Button>Refresh</Button>}
+        {currentTab == 1 && <Button>Reset</Button>}
+        {currentTab == 1 && <Button>Submit</Button>}
+        {currentTab == 2 && <FormLabel>X</FormLabel>}
+        {currentTab == 2 && <FormLabel>Y</FormLabel>}
       </Box>
 
       {/* Tab Content */}

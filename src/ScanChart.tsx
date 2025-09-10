@@ -18,7 +18,7 @@ interface ScanChartProps {
 }
 
 const initXAxisData: string[] = Array.from({ length: 40 }, (_, i) =>
-  i.toString()
+  (40 + i).toString()
 );
 
 const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
@@ -46,6 +46,19 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
     ? Math.max(...availableSteps.map(step => step.index), -1)
     : -1;
 
+  useEffect(() => {
+    console.log(scanData);
+    if (scanData == null) return;
+
+    const start = scanData.config.captureStartUs;
+    const end = scanData.config.captureEndUs;
+    const length = (end - start) * 20 + 1;
+
+    setxAxisData(
+      Array.from({ length }, (_, i) => (i * 0.05 + start).toFixed(1).toString())
+    );
+  }, [scanData]);
+
   // Reset step selection when angle changes
   useEffect(() => {
     if (hasData && selectedStepIndex > maxStepIndex) {
@@ -64,10 +77,6 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
     chartInstance.current = echarts.init(chartRef.current);
 
     const initialOption = {
-      title: {
-        text: 'Ultrasonic Data',
-        left: 'center',
-      },
       animation: false,
       animationDuration: 0,
       useGPUTranslucency: true,
@@ -113,6 +122,9 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
         nameLocation: 'middle',
         nameGap: 30,
         data: xAxisData,
+        axisLabel: {
+          interval: 200,
+        },
       },
       yAxis: {
         type: 'value',
@@ -174,7 +186,13 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
   // Update chart when selection changes
   useEffect(() => {
     updateChart();
-  }, [selectedChannels, selectedAngleIndex, selectedStepIndex, scanData]);
+  }, [
+    selectedChannels,
+    selectedAngleIndex,
+    selectedStepIndex,
+    xAxisData,
+    scanData,
+  ]);
 
   const getChannelColor = (channel: number): string => {
     const hue = ((channel * 360) / 64) % 360;
@@ -188,11 +206,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
       // Show empty chart with default axes
       chartInstance.current.setOption(
         {
-          title: { text: 'Ultrasonic Data', left: 'center' },
-          xAxis: {
-            data: Array.from({ length: 40 }, (_, i) => (40 + i).toString()),
-            // data: Array.from({ length: 100 }, (_, i) => i.toString()),
-          },
+          xAxis: { data: xAxisData },
           series: [],
         },
         {
@@ -211,16 +225,7 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
     if (!currentStep) {
       chartInstance.current.setOption(
         {
-          title: {
-            text: `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex}`,
-            left: 'center',
-          },
-          xAxis: {
-            data: Array.from({ length: 40 }, (_, i) => {
-              const timeUs = 40 + i / 20;
-              return timeUs.toFixed(2);
-            }),
-          },
+          xAxis: { data: xAxisData },
           series: [],
         },
         {
@@ -257,16 +262,12 @@ const ScanChart: React.FC<ScanChartProps> = ({ scanData }) => {
       }
     });
 
-    const xAxisData = Array.from({ length: maxSamples || 40 }, (_, i) =>
-      (40 + i).toString()
-    );
+    // const xAxisData = Array.from({ length: maxSamples || 40 }, (_, i) =>
+    //   (40 + i).toString()
+    // );
 
     chartInstance.current.setOption(
       {
-        title: {
-          text: `Ultrasonic Data - Angle ${selectedAngleIndex}, Step ${selectedStepIndex}`,
-          left: 'center',
-        },
         xAxis: { data: xAxisData },
         series: series,
       },

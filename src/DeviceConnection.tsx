@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Button,
   Table,
@@ -26,14 +25,14 @@ interface RongbukDevicesProps {
   devices: RongbukDevice[];
   onConnect: (device: RongbukDevice) => void;
   onDisconnect: (device: RongbukDevice) => void;
-  onRefresh: () => void;
+  // onRefresh: () => void;
 }
 
 const RongbukDevices: React.FC<RongbukDevicesProps> = ({
   devices,
   onConnect,
   onDisconnect,
-  onRefresh,
+  // onRefresh,
 }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [debouncing, setDebouncing] = useState<boolean>(false);
@@ -43,11 +42,11 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
     setTimeout(() => setDebouncing(false), 500);
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await onRefresh();
-    setTimeout(() => setRefreshing(false), 500);
-  };
+  // const handleRefresh = async () => {
+  //   setRefreshing(true);
+  //   await onRefresh();
+  //   setTimeout(() => setRefreshing(false), 500);
+  // };
 
   const formatLocation = (location: string | string[]): string => {
     if (Array.isArray(location)) {
@@ -83,34 +82,9 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
   };
 
   return (
-    <Box mt={2}>
-      {/* Header */}
-      {/* <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      > */}
-      <Toolbar>
-        <Button
-          size="small"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          startIcon={
-            refreshing ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              <RefreshIcon />
-            )
-          }
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </Button>
-        {/* </Box> */}
-      </Toolbar>
-
+    <Box mt={2} p={0}>
       {/* Device Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+      <TableContainer component={Box}>
         <Table size="medium">
           <TableHead sx={{ bgcolor: 'grey.50' }}>
             <TableRow>
@@ -118,6 +92,7 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
                 sx={{
                   color: 'text.secondary',
                   fontWeight: 'bold',
+                  width: '30%',
                 }}
               >
                 Device Name
@@ -126,15 +101,17 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
                 sx={{
                   color: 'text.secondary',
                   fontWeight: 'bold',
+                  width: '30%',
                 }}
               >
-                Location
+                Address
               </TableCell>
               <TableCell
                 align="right"
                 sx={{
                   color: 'text.secondary',
                   fontWeight: 'bold',
+                  width: '40%',
                 }}
               >
                 Actions
@@ -143,17 +120,7 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
           </TableHead>
           <TableBody>
             {devices.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 6 }}>
-                  <Typography
-                    color="text.secondary"
-                    fontStyle="italic"
-                    variant="body2"
-                  >
-                    No devices found. Click refresh to scan for devices.
-                  </Typography>
-                </TableCell>
-              </TableRow>
+              <TableRow></TableRow>
             ) : (
               devices.map(device => {
                 const {

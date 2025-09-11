@@ -8,6 +8,7 @@ import {
   Box,
   Button,
   FormLabel,
+  CircularProgress,
 } from '@mui/material';
 
 import { RongbukDevice } from './types/devices';
@@ -19,6 +20,7 @@ import ControlPanel from './ControlPanel';
 import type { JsonConfig } from './ControlPanel';
 
 import ScanChart from './ScanChart';
+import { Refresh } from '@mui/icons-material';
 
 const { ipcRenderer } = window.require('electron');
 
@@ -39,7 +41,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box>{children}</Box>}
     </div>
   );
 }
@@ -51,7 +53,7 @@ function a11yProps(index: number) {
   };
 }
 
-const UltrasonicScannerApp: React.FC = () => {
+const RongbukApp: React.FC = () => {
   // Tab state
   const [currentTab, setCurrentTab] = useState(0);
 
@@ -59,6 +61,8 @@ const UltrasonicScannerApp: React.FC = () => {
   const [currentConfig, setCurrentConfig] = useState<JsonConfig>(null);
   const [scanData, setScanData] = useState<any>(null);
   const [devices, setDevices] = useState<RongbukDevice[]>([]);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [requesting, setRequesting] = useState<boolean>(false);
 
   const handleDeviceUpdate = (
     event: IpcRendererEvent,
@@ -107,6 +111,8 @@ const UltrasonicScannerApp: React.FC = () => {
   };
 
   const onDeviceRefresh = (): void => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 500);
     setDevices([]);
     setImmediate(() => ipcRenderer.send('user-refresh-devices'));
   };
@@ -153,8 +159,23 @@ const UltrasonicScannerApp: React.FC = () => {
           <Tab label="Configuration" {...a11yProps(1)} />
           <Tab label="Results" {...a11yProps(2)} />
         </Tabs>
-        {/* {currentTab == 0 && <Button>Refresh</Button>}
-        {currentTab == 1 && <Button>Reset</Button>}
+        {currentTab == 0 && (
+          <Button
+            size="small"
+            onClick={onDeviceRefresh}
+            disabled={refreshing}
+            startIcon={
+              refreshing ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <Refresh />
+              )
+            }
+          >
+            Refresh
+          </Button>
+        )}
+        {/* {currentTab == 1 && <Button>Reset</Button>}
         {currentTab == 1 && <Button>Submit</Button>}
         {currentTab == 2 && <FormLabel>X</FormLabel>}
         {currentTab == 2 && <FormLabel>Y</FormLabel>} */}
@@ -168,7 +189,6 @@ const UltrasonicScannerApp: React.FC = () => {
             devices={devices}
             onConnect={onDeviceConnect}
             onDisconnect={onDeviceDisconnect}
-            onRefresh={onDeviceRefresh}
           />
         </TabPanel>
 
@@ -202,4 +222,4 @@ const UltrasonicScannerApp: React.FC = () => {
   );
 };
 
-export default UltrasonicScannerApp;
+export default RongbukApp;

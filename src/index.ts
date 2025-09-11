@@ -12,6 +12,11 @@ import {
 
 import * as net from 'net';
 
+const {
+  default: installExtension,
+  REACT_DEVELOPER_TOOLS,
+} = require('electron-devtools-installer');
+
 // import { SerialPort } from 'serialport';
 
 import type { ConnectionState, RongbukDevice } from './types/devices';
@@ -203,6 +208,10 @@ const updateMenuSelectDevice = (enabled: boolean): void => {
  * create main window, with extra menucommand
  */
 const createMainWindow = (): void => {
+  installExtension(REACT_DEVELOPER_TOOLS)
+    .then(() => console.log('React DevTools installed'))
+    .catch((e: Error) => console.log(e));
+
   mainWindow = new BrowserWindow({
     height: 600,
     width: 800,

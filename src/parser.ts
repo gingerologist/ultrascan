@@ -45,7 +45,7 @@ export interface CompleteScanData {
   angles: AngleData[];
 }
 
-interface DataPacket {
+export interface DataPacket {
   scanId: number;
   angleIndex: number;
   stepIndex: number;
@@ -79,6 +79,8 @@ export class UltrasonicDataParser {
   // Callback for complete scan data
   public onScanComplete?: (scanData: CompleteScanData) => void;
   public onParseError?: (error: string) => void;
+  public onConfig?: (cfg: ScanConfig) => void;
+  public onPacketReceived?: (num: number) => void;
 
   public processData(newData: Uint8Array): void {
     const combined = new Uint8Array(this.buffer.length + newData.length);
@@ -211,6 +213,14 @@ export class UltrasonicDataParser {
         dataPackets: new Map(),
         totalExpectedPackets: packet.config.totalSteps * 64, // 64 channels, no baseline
       };
+
+      console.log(
+        'parser, handle metadata packet',
+        packet.config,
+        this.onConfig
+      );
+
+      this.onConfig?.(packet.config);
     } else if (packet.type === 'data') {
       // Handle data packet
       if (
@@ -222,6 +232,8 @@ export class UltrasonicDataParser {
 
       const dataKey = `${packet.packet.angleIndex}_${packet.packet.stepIndex}_${packet.packet.channelIndex}`;
       this.currentScan.dataPackets.set(dataKey, packet.packet);
+
+      this.onPacketReceived?.(this.currentScan.dataPackets.size);
 
       // Check if scan is complete
       if (

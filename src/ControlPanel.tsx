@@ -45,9 +45,8 @@ export interface JsonConfig {
 }
 
 interface ControlPanelProps {
-  disableSumbit?: boolean;
-  onSubmit?: (config: JsonConfig) => void;
   onConfigChange?: (config: JsonConfig) => void;
+  onOffResetClick: (onClick: () => void) => () => void;
 }
 
 // These styles are from official slider customization examples.
@@ -102,7 +101,7 @@ const getIOSSliderStyleEx: SxProps = (theme: Theme) => ({
   },
 });
 
-const defaultConfig: JsonConfig = {
+export const defaultConfig: JsonConfig = {
   version: '1.0',
   name: '',
   angles: [{ degree: 0, masks: [0] }],
@@ -127,9 +126,8 @@ const defaultPattern: PatternUnit[] = Array(16)
   );
 
 const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
-  disableSumbit = true,
-  onSubmit = () => {},
   onConfigChange,
+  onOffResetClick,
 }) => {
   const theme = useTheme();
   const iosStyleEx: SxProps = getIOSSliderStyleEx(theme);
@@ -146,6 +144,20 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const [steps, setSteps] = useState(1);
   const [patternUnits, setPatternUnits] =
     useState<PatternUnit[]>(defaultPattern);
+
+  useEffect(
+    () =>
+      onOffResetClick(() => {
+        setConfig(defaultConfig);
+        setPatternUnits(defaultPattern);
+        setAngleRange([0, 0]);
+        setCommittedAngleRange([0, 0]);
+        setSelectedDivisor(2);
+        setAvailableDivisors([]);
+        setSteps(1);
+      }),
+    []
+  );
 
   // Calculate masks for ultrasonic channels based on steps
   const calculateMasks = useCallback((steps: number): number[] => {
@@ -375,42 +387,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   );
 
   return (
-    <Box p={3} mb={4}>
-      {/* Header */}
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
-        <Typography
-          variant="h5"
-          color="text.secondary"
-          fontWeight="medium"
-          onClick={printConfig}
-        >
-          Scan Configuration
-        </Typography>
-        <Stack direction="row" spacing={2}>
-          <Button
-            variant="text"
-            startIcon={<RefreshIcon />}
-            onClick={resetConfig}
-            size="small"
-          >
-            Reset
-          </Button>
-          <Button
-            variant="text"
-            onClick={() => onSubmit(config)}
-            disabled={disableSumbit}
-            size="small"
-          >
-            Submit
-          </Button>
-        </Stack>
-      </Box>
-
+    <Box mt={2}>
       {/* Compact Form Layout */}
       <Table sx={{ '& td': { border: 0, py: 1.5 } }}>
         <TableBody>

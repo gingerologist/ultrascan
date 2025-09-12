@@ -82,7 +82,7 @@ const RongbukDevices: React.FC<RongbukDevicesProps> = ({
   };
 
   return (
-    <Box mt={2} p={0}>
+    <Box mt={2}>
       {/* Device Table */}
       <TableContainer component={Box}>
         <Table size="medium">

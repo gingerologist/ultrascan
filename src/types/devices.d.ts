@@ -39,13 +39,15 @@
  */
 
 import { JsonConfig } from 'src/ControlPanel';
-import { CompleteScanData } from 'src/parser';
+import { CompleteScanData, ScanConfig } from 'src/parser';
 
 export type ConnectionState =
   | 'CONNECTED'
   | 'DISCONNECTED'
   | 'CONNECTING'
   | 'DISCONNECTING';
+
+export type Frac = [number, number];
 
 /**
  * Rongbuk is the codename of the ultrasonic scanner hardware in this project
@@ -77,5 +79,7 @@ export interface IPCChannels {
 
   'user-submit-scan-config': JsonConfig;
 
+  'device-scancfg': ScanConfig;
+  'device-pktrcvd': number;
   'device-scandata': CompleteScanData;
 }

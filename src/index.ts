@@ -22,7 +22,7 @@ const {
 import type { ConnectionState, RongbukDevice } from './types/devices';
 
 import { UltrasonicDataParser } from './parser';
-import type { CompleteScanData } from './parser';
+import type { CompleteScanData, ScanConfig, DataPacket } from './parser';
 
 import { error } from 'console';
 import discoverDevices from './discover-devices';
@@ -31,8 +31,19 @@ import { JsonConfig } from './ControlPanel';
 
 const parser = new UltrasonicDataParser();
 
-// parser.onDataPacketReceived = () => console.log('data packet arrived');
-// parser.onMetadataReceived = () => console.log('meta packet received');
+parser.onConfig = (config: ScanConfig) => {
+  console.log('scan config', config);
+  if (mainWindow) {
+    mainWindow.webContents.send('device-scancfg', config);
+  }
+};
+
+parser.onPacketReceived = (num: number) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('device-pktrcvd', num);
+  }
+};
+
 parser.onScanComplete = (data: CompleteScanData) => {
   console.log('scan complete', data);
   if (mainWindow) {

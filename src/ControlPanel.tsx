@@ -20,7 +20,7 @@ import { useTheme, SxProps } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 
 import PatternControl from './PatternControl';
-import type { PatternUnit } from './PatternControl';
+// import type { PatternUnit } from './PatternControl';
 
 // Type definitions matching your schema
 interface JsonAngle {
@@ -105,15 +105,19 @@ const DEFAULTS = {
   tail: 5,
   version: '1.0',
   name: 'noname',
-  patternUnits: Array(16)
-    .fill(null)
-    .map((_, index) =>
-      index === 0
-        ? { range: 5, position: 'top' as const }
-        : index === 1
-        ? { range: 5, position: 'bottom' as const }
-        : { range: 2, position: 'none' as const }
-    ) as PatternUnit[],
+  // patternUnits: Array(16)
+  //   .fill(null)
+  //   .map((_, index) =>
+  //     index === 0
+  //       ? { range: 5, position: 'top' as const }
+  //       : index === 1
+  //       ? { range: 5, position: 'bottom' as const }
+  //       : { range: 2, position: 'none' as const }
+  //   ) as PatternUnit[],
+  pattern: [
+    [5, 2],
+    [5, 1],
+  ] as JsonPatternSegment[],
 };
 
 const calculateDivisors = (range: number): number[] => {
@@ -212,8 +216,11 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const [repeat, setRepeat] = useState(DEFAULTS.repeat);
   const [tail, setTail] = useState(DEFAULTS.tail);
 
-  const [patternUnits, setPatternUnits] = useState<PatternUnit[]>(
-    DEFAULTS.patternUnits
+  // const [patternUnits, setPatternUnits] = useState<PatternUnit[]>(
+  //   DEFAULTS.patternUnits
+  // );
+  const [pattern, setPattern] = useState<JsonPatternSegment[]>(
+    DEFAULTS.pattern
   );
 
   const [angleRange, setAngleRange] = useState<[number, number]>(
@@ -247,10 +254,10 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     tailRef.current = tail;
   }, [tail]);
 
-  const patternUnitsRef = useRef(patternUnits);
+  const patternRef = useRef(pattern);
   useEffect(() => {
-    patternUnitsRef.current = patternUnits;
-  }, [patternUnits]);
+    patternRef.current = pattern;
+  }, [pattern]);
 
   const committedAngleRangeRef = useRef(committedAngleRange);
   useEffect(() => {
@@ -278,7 +285,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
       setEndUs(DEFAULTS.endUs);
       setRepeat(DEFAULTS.repeat);
       setTail(DEFAULTS.tail);
-      setPatternUnits(DEFAULTS.patternUnits);
+      setPattern(DEFAULTS.pattern);
       setAngleRange(DEFAULTS.angleRange);
       setCommittedAngleRange(DEFAULTS.committedAngleRange);
       setSelectedDivisor(DEFAULTS.selectedDivisor);
@@ -296,7 +303,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
           selectedDivisorRef.current,
           stepsRef.current
         ),
-        pattern: convertPatternUnits(patternUnitsRef.current),
+        pattern: patternRef.current, // convertPatternUnits(patternUnitsRef.current),
         repeat: repeatRef.current,
         tail: tailRef.current,
         startUs: startUsRef.current,
@@ -308,41 +315,41 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     });
   }, []);
 
-  const convertPatternUnits = (units: PatternUnit[]): JsonPatternSegment[] => {
-    const patterns: JsonPatternSegment[] = [];
+  // const convertPatternUnits = (units: PatternUnit[]): JsonPatternSegment[] => {
+  //   const patterns: JsonPatternSegment[] = [];
 
-    // Process pattern units until we hit the first 'none' (terminator)
-    for (const unit of patternUnits) {
-      if (unit.position === 'none') {
-        // First 'none' acts as terminator, stop processing
-        break;
-      }
+  //   // Process pattern units until we hit the first 'none' (terminator)
+  //   for (const unit of patternUnits) {
+  //     if (unit.position === 'none') {
+  //       // First 'none' acts as terminator, stop processing
+  //       break;
+  //     }
 
-      // Map positions to register values:
-      // bottom (negative high voltage) -> 1
-      // top (positive high voltage) -> 2
-      // middle (ground level) -> 3
-      let registerValue: number;
-      switch (unit.position) {
-        case 'bottom':
-          registerValue = 1;
-          break;
-        case 'top':
-          registerValue = 2;
-          break;
-        case 'middle':
-          registerValue = 3;
-          break;
-        default:
-          // This shouldn't happen since we break on 'none', but just in case
-          continue;
-      }
+  //     // Map positions to register values:
+  //     // bottom (negative high voltage) -> 1
+  //     // top (positive high voltage) -> 2
+  //     // middle (ground level) -> 3
+  //     let registerValue: number;
+  //     switch (unit.position) {
+  //       case 'bottom':
+  //         registerValue = 1;
+  //         break;
+  //       case 'top':
+  //         registerValue = 2;
+  //         break;
+  //       case 'middle':
+  //         registerValue = 3;
+  //         break;
+  //       default:
+  //         // This shouldn't happen since we break on 'none', but just in case
+  //         continue;
+  //     }
 
-      patterns.push([unit.range, registerValue]);
-    }
+  //     patterns.push([unit.range, registerValue]);
+  //   }
 
-    return patterns;
-  };
+  //   return patterns;
+  // };
 
   // Handle visual update during dragging (no calculations)
   const handleAngleRangeVisualChange = (
@@ -487,8 +494,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
             <LabelCell label="Pattern" />
             <TableCell>
               <PatternControl
-                units={patternUnits}
-                onUnitsChange={newUnits => setPatternUnits(newUnits)}
+                pattern={pattern}
+                onPatternChange={newPattern => setPattern(newPattern)}
               />
             </TableCell>
           </TableRow>

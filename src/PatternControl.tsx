@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 
 import { useTheme } from '@mui/material/styles';
 
@@ -13,30 +13,99 @@ import {
   Typography,
 } from '@mui/material';
 
-// Pattern unit configuration
-export interface PatternUnit {
+// Config format (what the component exposes)
+type JsonPatternSegment = [number, number]; // [duration, level]
+
+// Internal UI format (kept private to this component)
+interface PatternUnit {
   range: number;
   position: 'top' | 'middle' | 'bottom' | 'none';
 }
 
-// PatternControl Component Props
+// Updated component props - now works with config format
 export interface PatternControlProps {
-  units: PatternUnit[];
-  onUnitsChange: (units: PatternUnit[]) => void;
+  pattern: JsonPatternSegment[];
+  onPatternChange: (pattern: JsonPatternSegment[]) => void;
   error?: string;
   onErrorChange?: (error: string) => void;
 }
 
+// Conversion functions (internal to component)
+const convertConfigToUnits = (pattern: JsonPatternSegment[]): PatternUnit[] => {
+  const units: PatternUnit[] = [];
+
+  // Convert config segments to UI units
+  for (const [range, level] of pattern) {
+    let position: PatternUnit['position'];
+    switch (level) {
+      case 1:
+        position = 'bottom';
+        break; // negative high voltage
+      case 2:
+        position = 'top';
+        break; // positive high voltage
+      case 3:
+        position = 'middle';
+        break; // ground level
+      default:
+        position = 'none';
+        break;
+    }
+    units.push({ range, position });
+  }
+
+  // Fill remaining slots with 'none' up to 16 total
+  while (units.length < 16) {
+    units.push({ range: 2, position: 'none' });
+  }
+
+  return units;
+};
+
+const convertUnitsToConfig = (units: PatternUnit[]): JsonPatternSegment[] => {
+  const pattern: JsonPatternSegment[] = [];
+
+  // Process units until we hit the first 'none' (terminator)
+  for (const unit of units) {
+    if (unit.position === 'none') {
+      break;
+    }
+
+    // Map positions to register values
+    let registerValue: number;
+    switch (unit.position) {
+      case 'bottom':
+        registerValue = 1;
+        break; // negative high voltage
+      case 'top':
+        registerValue = 2;
+        break; // positive high voltage
+      case 'middle':
+        registerValue = 3;
+        break; // ground level
+      default:
+        continue;
+    }
+
+    pattern.push([unit.range, registerValue]);
+  }
+
+  return pattern;
+};
+
 // Standalone Pattern Control Component
 const PatternControl: React.FC<PatternControlProps> = ({
-  units,
-  onUnitsChange,
+  pattern,
+  onPatternChange,
   error,
   onErrorChange,
 }) => {
   const theme = useTheme();
   const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
   const [activeUnitIndex, setActiveUnitIndex] = useState<number>(-1);
+
+  // Convert config format to internal UI format
+  const units = useMemo(() => convertConfigToUnits(pattern), [pattern]);
 
   // Handle pattern unit click
   const handleUnitClick = (
@@ -53,11 +122,14 @@ const PatternControl: React.FC<PatternControlProps> = ({
     setActiveUnitIndex(-1);
   };
 
-  // Update pattern unit
+  // Update pattern unit and convert back to config format
   const updatePatternUnit = (index: number, updates: Partial<PatternUnit>) => {
     const newUnits = [...units];
     newUnits[index] = { ...newUnits[index], ...updates };
-    onUnitsChange(newUnits);
+
+    // Convert back to config format and notify parent
+    const newPattern = convertUnitsToConfig(newUnits);
+    onPatternChange(newPattern);
 
     // Clear error when user makes changes
     if (error && onErrorChange) {

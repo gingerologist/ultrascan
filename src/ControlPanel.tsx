@@ -96,7 +96,7 @@ const getIOSSliderStyleEx: SxProps = (theme: Theme) => ({
 const DEFAULTS = {
   angleRange: [0, 0] as [number, number],
   committedAngleRange: [0, 0] as [number, number],
-  selectedDivisor: 2,
+  selectedDivisor: 1,
   steps: 1,
 
   startUs: 40,
@@ -114,6 +114,78 @@ const DEFAULTS = {
         ? { range: 5, position: 'bottom' as const }
         : { range: 2, position: 'none' as const }
     ) as PatternUnit[],
+};
+
+const calculateDivisors = (range: number): number[] => {
+  const divisors: number[] = [1]; // Always include 1 as a valid divisor
+
+  if (range === 0) return divisors; // Only return [1] for zero range
+
+  for (let i = 2; i <= range; i++) {
+    if (range % i === 0) divisors.push(i);
+  }
+  return divisors;
+};
+
+// Calculate masks for ultrasonic channels based on steps
+const calculateMasks = (steps: number): number[] => {
+  const masks: number[] = [];
+
+  if (steps === 1) {
+    // All channels [0..31] allowed (all bits 0)
+    return [0x00000000];
+  }
+
+  // Calculate the number of channels per step
+  const channelsPerStep = 32 - steps + 1;
+
+  for (let step = 0; step < steps; step++) {
+    let mask = 0xffffffff; // Start with all bits set (all channels powered down)
+
+    // For step i, enable channels [i..i+channelsPerStep-1]
+    const startChannel = step;
+    const endChannel = step + channelsPerStep - 1;
+
+    // Clear bits for channels that should be powered on (bit 0 = allowed)
+    for (let channel = startChannel; channel <= endChannel; channel++) {
+      mask &= ~(1 << channel);
+    }
+
+    masks.push(mask >>> 0); // Ensure unsigned 32-bit integer
+  }
+
+  return masks;
+};
+
+const calculateAngles = (
+  committedAngleRange: [number, number],
+  selectedDivisor: number,
+  steps: number
+): JsonAngle[] => {
+  const [start, end] = committedAngleRange;
+  const range = Math.abs(end - start);
+  const angles: JsonAngle[] = [];
+  const masks = calculateMasks(steps);
+
+  if (range === 0) {
+    // Only one angle when range is 0
+    angles.push({
+      degree: start,
+      masks,
+    });
+  } else {
+    const divisor = selectedDivisor;
+    const stepSize = range / divisor;
+    for (let i = 0; i <= divisor; i++) {
+      const degree = start + i * stepSize;
+      angles.push({
+        degree: Math.round(degree * 100) / 100,
+        masks: masks,
+      });
+    }
+  }
+
+  return angles;
 };
 
 interface ControlPanelProps {
@@ -195,16 +267,6 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     stepsRef.current = steps;
   }, [steps]);
 
-  const calculateDivisors = (range: number): number[] => {
-    if (range === 0) return [];
-    const divisors: number[] = [];
-    for (let i = 2; i <= range; i++) {
-      if (range % i === 0) divisors.push(i);
-    }
-    return divisors;
-  };
-
-  // Use in render:
   const availableDivisors = useMemo(() => {
     const range = Math.abs(committedAngleRange[1] - committedAngleRange[0]);
     return calculateDivisors(range);
@@ -229,7 +291,11 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
       let config = {
         version: DEFAULTS.version,
         name: DEFAULTS.name,
-        angles: calculateAngles(),
+        angles: calculateAngles(
+          committedAngleRangeRef.current,
+          selectedDivisorRef.current,
+          stepsRef.current
+        ),
         pattern: convertPatternUnits(patternUnitsRef.current),
         repeat: repeatRef.current,
         tail: tailRef.current,
@@ -241,63 +307,6 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
       return config;
     });
   }, []);
-
-  // Calculate masks for ultrasonic channels based on steps
-  const calculateMasks = (steps: number): number[] => {
-    const masks: number[] = [];
-
-    if (steps === 1) {
-      // All channels [0..31] allowed (all bits 0)
-      return [0x00000000];
-    }
-
-    // Calculate the number of channels per step
-    const channelsPerStep = 32 - steps + 1;
-
-    for (let step = 0; step < steps; step++) {
-      let mask = 0xffffffff; // Start with all bits set (all channels powered down)
-
-      // For step i, enable channels [i..i+channelsPerStep-1]
-      const startChannel = step;
-      const endChannel = step + channelsPerStep - 1;
-
-      // Clear bits for channels that should be powered on (bit 0 = allowed)
-      for (let channel = startChannel; channel <= endChannel; channel++) {
-        mask &= ~(1 << channel);
-      }
-
-      masks.push(mask >>> 0); // Ensure unsigned 32-bit integer
-    }
-
-    return masks;
-  };
-
-  // Calculate angles from UI controls (use committed values)
-  const calculateAngles = (): JsonAngle[] => {
-    const [start, end] = committedAngleRangeRef.current;
-    const range = Math.abs(end - start);
-    const angles: JsonAngle[] = [];
-    const masks = calculateMasks(stepsRef.current);
-
-    if (range === 0 || availableDivisors.length === 0) {
-      angles.push({
-        degree: start,
-        masks,
-      });
-    } else {
-      const divisor = selectedDivisorRef.current;
-      const stepSize = range / divisor;
-      for (let i = 0; i <= divisor; i++) {
-        const degree = start + i * stepSize;
-        angles.push({
-          degree: Math.round(degree * 100) / 100,
-          masks: masks,
-        });
-      }
-    }
-
-    return angles;
-  };
 
   const convertPatternUnits = (units: PatternUnit[]): JsonPatternSegment[] => {
     const patterns: JsonPatternSegment[] = [];
@@ -359,10 +368,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     const range = Math.abs(newEnd - newStart);
     const divisors = calculateDivisors(range);
 
-    // Reset divisor to 2 if available, otherwise first available divisor
-    if (divisors.length > 0) {
-      setSelectedDivisor(divisors.includes(2) ? 2 : divisors[0]);
-    }
+    setSelectedDivisor(divisors.includes(1) ? 1 : divisors[0]);
   };
 
   const LabelCell = ({ label }: { label: string }) => (
@@ -414,17 +420,16 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                 sx={{ minWidth: 120 }}
                 displayEmpty
               >
-                {availableDivisors.length === 0 ? (
-                  <MenuItem value={2} disabled>
-                    -
+                {availableDivisors.map(divisor => (
+                  <MenuItem key={divisor} value={divisor}>
+                    {(() => {
+                      const range = Math.abs(
+                        committedAngleRange[1] - committedAngleRange[0]
+                      );
+                      return range === 0 ? '1 angle' : `${divisor + 1} angles`;
+                    })()}
                   </MenuItem>
-                ) : (
-                  availableDivisors.map(divisor => (
-                    <MenuItem key={divisor} value={divisor}>
-                      {divisor} parts
-                    </MenuItem>
-                  ))
-                )}
+                ))}
               </Select>
             </TableCell>
           </TableRow>
@@ -440,8 +445,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
                   const range = Math.abs(end - start);
                   const angles: number[] = [];
 
-                  if (range === 0 || availableDivisors.length === 0) {
-                    angles.push(start);
+                  if (range === 0) {
+                    angles.push(start); // Only one angle when range is 0
                   } else {
                     const stepSize = range / selectedDivisor;
                     for (let i = 0; i <= selectedDivisor; i++) {

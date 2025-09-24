@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  useMemo,
-} from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -99,29 +93,28 @@ const getIOSSliderStyleEx: SxProps = (theme: Theme) => ({
   },
 });
 
-const defaultConfig: JsonConfig = {
-  version: '1.0',
-  name: '',
-  angles: [{ degree: 0, masks: [0] }],
-  pattern: [
-    [5, 2],
-    [5, 1],
-  ],
-  repeat: 2,
-  tail: 5,
+const DEFAULTS = {
+  angleRange: [0, 0] as [number, number],
+  committedAngleRange: [0, 0] as [number, number],
+  selectedDivisor: 2,
+  steps: 1,
+
   startUs: 40,
   endUs: 80,
+  repeat: 2,
+  tail: 5,
+  version: '1.0',
+  name: 'noname',
+  patternUnits: Array(16)
+    .fill(null)
+    .map((_, index) =>
+      index === 0
+        ? { range: 5, position: 'top' as const }
+        : index === 1
+        ? { range: 5, position: 'bottom' as const }
+        : { range: 2, position: 'none' as const }
+    ) as PatternUnit[],
 };
-
-const defaultPattern: PatternUnit[] = Array(16)
-  .fill(null)
-  .map((_, index) =>
-    index === 0
-      ? { range: 5, position: 'top' as const }
-      : index === 1
-      ? { range: 5, position: 'bottom' as const }
-      : { range: 2, position: 'none' as const }
-  );
 
 interface ControlPanelProps {
   // this register function returns a unregister function
@@ -142,20 +135,25 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const iosStyleEx: SxProps = getIOSSliderStyleEx(theme);
   const tableRowSx: SxProps = { height: 136 };
 
-  const [startUs, setStartUs] = useState(40); // TODO:
-  const [endUs, setEndUs] = useState(80); // TODO:
-  const [repeat, setRepeat] = useState(2); // TODO:
-  const [tail, setTail] = useState(5); // TODO:
-  const [patternUnits, setPatternUnits] =
-    useState<PatternUnit[]>(defaultPattern); // TODO:
+  const [startUs, setStartUs] = useState(DEFAULTS.startUs);
+  const [endUs, setEndUs] = useState(DEFAULTS.endUs);
+  const [repeat, setRepeat] = useState(DEFAULTS.repeat);
+  const [tail, setTail] = useState(DEFAULTS.tail);
 
-  // TODO:
-  const [angleRange, setAngleRange] = useState<[number, number]>([0, 0]);
+  const [patternUnits, setPatternUnits] = useState<PatternUnit[]>(
+    DEFAULTS.patternUnits
+  );
+
+  const [angleRange, setAngleRange] = useState<[number, number]>(
+    DEFAULTS.angleRange
+  );
   const [committedAngleRange, setCommittedAngleRange] = useState<
     [number, number]
-  >([0, 0]);
-  const [selectedDivisor, setSelectedDivisor] = useState(2);
-  const [steps, setSteps] = useState(1);
+  >(DEFAULTS.committedAngleRange);
+  const [selectedDivisor, setSelectedDivisor] = useState(
+    DEFAULTS.selectedDivisor
+  );
+  const [steps, setSteps] = useState(DEFAULTS.steps);
 
   const startUsRef = useRef(startUs);
   useEffect(() => {
@@ -183,10 +181,19 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   }, [patternUnits]);
 
   const committedAngleRangeRef = useRef(committedAngleRange);
-  const selectedDivisorRef = useRef(selectedDivisor);
-  const stepsRef = useRef(steps);
+  useEffect(() => {
+    committedAngleRangeRef.current = committedAngleRange;
+  }, [committedAngleRange]);
 
-  const [config, setConfig] = useState<JsonConfig>(defaultConfig);
+  const selectedDivisorRef = useRef(selectedDivisor);
+  useEffect(() => {
+    selectedDivisorRef.current = selectedDivisor;
+  }, [selectedDivisor]);
+
+  const stepsRef = useRef(steps);
+  useEffect(() => {
+    stepsRef.current = steps;
+  }, [steps]);
 
   const calculateDivisors = (range: number): number[] => {
     if (range === 0) return [];
@@ -205,24 +212,24 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
 
   useEffect(() => {
     return registerResetConfigHandler(() => {
-      setConfig(defaultConfig);
-      setPatternUnits(defaultPattern);
-      setAngleRange([0, 0]);
-      setCommittedAngleRange([0, 0]);
-      setSelectedDivisor(2);
-      setSteps(1);
+      setStartUs(DEFAULTS.startUs);
+      setEndUs(DEFAULTS.endUs);
+      setRepeat(DEFAULTS.repeat);
+      setTail(DEFAULTS.tail);
+      setPatternUnits(DEFAULTS.patternUnits);
+      setAngleRange(DEFAULTS.angleRange);
+      setCommittedAngleRange(DEFAULTS.committedAngleRange);
+      setSelectedDivisor(DEFAULTS.selectedDivisor);
+      setSteps(DEFAULTS.steps);
     });
   }, []);
-
-  const configRef = useRef(config);
-  useEffect(() => {
-    configRef.current = config;
-  }, [config]);
 
   useEffect(() => {
     return registerApplyConfigHandler(() => {
       let config = {
-        ...configRef.current,
+        version: DEFAULTS.version,
+        name: DEFAULTS.name,
+        angles: calculateAngles(),
         pattern: convertPatternUnits(patternUnitsRef.current),
         repeat: repeatRef.current,
         tail: tailRef.current,
@@ -236,7 +243,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   }, []);
 
   // Calculate masks for ultrasonic channels based on steps
-  const calculateMasks = useCallback((steps: number): number[] => {
+  const calculateMasks = (steps: number): number[] => {
     const masks: number[] = [];
 
     if (steps === 1) {
@@ -263,14 +270,14 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     }
 
     return masks;
-  }, []);
+  };
 
   // Calculate angles from UI controls (use committed values)
-  const calculateAngles = useCallback((): JsonAngle[] => {
-    const [start, end] = committedAngleRange;
+  const calculateAngles = (): JsonAngle[] => {
+    const [start, end] = committedAngleRangeRef.current;
     const range = Math.abs(end - start);
     const angles: JsonAngle[] = [];
-    const masks = calculateMasks(steps);
+    const masks = calculateMasks(stepsRef.current);
 
     if (range === 0 || availableDivisors.length === 0) {
       angles.push({
@@ -278,8 +285,9 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
         masks,
       });
     } else {
-      const stepSize = range / selectedDivisor;
-      for (let i = 0; i <= selectedDivisor; i++) {
+      const divisor = selectedDivisorRef.current;
+      const stepSize = range / divisor;
+      for (let i = 0; i <= divisor; i++) {
         const degree = start + i * stepSize;
         angles.push({
           degree: Math.round(degree * 100) / 100,
@@ -289,13 +297,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
     }
 
     return angles;
-  }, [
-    committedAngleRange,
-    selectedDivisor,
-    availableDivisors,
-    steps,
-    calculateMasks,
-  ]);
+  };
 
   const convertPatternUnits = (units: PatternUnit[]): JsonPatternSegment[] => {
     const patterns: JsonPatternSegment[] = [];
@@ -332,16 +334,6 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
 
     return patterns;
   };
-
-  // Update config whenever calculated values change (use committed values)
-  useEffect(() => {
-    const newAngles = calculateAngles();
-
-    setConfig(prevConfig => ({
-      ...prevConfig,
-      angles: newAngles,
-    }));
-  }, [committedAngleRange, selectedDivisor, steps, calculateAngles]);
 
   // Handle visual update during dragging (no calculations)
   const handleAngleRangeVisualChange = (
@@ -501,11 +493,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
             <LabelCell label="Repeat" />
             <TableCell sx={{ verticalAlign: 'bottom' }}>
               <Slider
-                value={config.repeat}
-                onChange={(_, value) =>
-                  // setConfig({ ...config, repeat: value as number }) TODO:
-                  setRepeat(value as number)
-                }
+                value={repeat}
+                onChange={(_, value) => setRepeat(value as number)}
                 min={1}
                 max={31}
                 step={1}
@@ -525,11 +514,8 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
             <LabelCell label="Tail" />
             <TableCell sx={{ verticalAlign: 'bottom' }}>
               <Slider
-                value={config.tail}
-                onChange={(_, value) => {
-                  // setConfig({ ...config, tail: value as number }); // TODO:
-                  setTail(value as number);
-                }}
+                value={tail}
+                onChange={(_, value) => setTail(value as number)}
                 min={2}
                 max={32}
                 step={1}
@@ -550,14 +536,11 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
             <TableCell>
               <Slider
                 value={[startUs, endUs]}
-                onChange={
-                  // handleWindowRangeChange // TODO:
-                  (_, value: number | number[]) => {
-                    let [start, end] = value as [number, number];
-                    setStartUs(start);
-                    setEndUs(end);
-                  }
-                }
+                onChange={(_, value: number | number[]) => {
+                  let [start, end] = value as [number, number];
+                  setStartUs(start);
+                  setEndUs(end);
+                }}
                 min={20}
                 max={200}
                 step={2}

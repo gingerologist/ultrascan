@@ -87,7 +87,6 @@ const RongbukApp: React.FC = () => {
   const [currentTab, setCurrentTab] = useState(0);
 
   // Scan data
-  const [currentConfig, setCurrentConfig] = useState<JsonConfig | null>(null);
   const [scanconfig, setScanConfig] = useState<ScanConfig | null>(null);
   const [scanData, setScanData] = useState<any>(null);
   const [devices, setDevices] = useState<RongbukDevice[]>([]);
@@ -286,7 +285,6 @@ const RongbukApp: React.FC = () => {
         {/* Configuration Tab */}
         <TabPanel value={currentTab} index={1}>
           <ControlPanel
-            onConfigChange={(cfg: JsonConfig) => setCurrentConfig(cfg)}
             registerResetConfigHandler={registerResetConfigHandler}
             registerApplyConfigHandler={registerApplyConfigHandler}
           />

@@ -17,11 +17,12 @@ import { IpcRendererEvent } from 'electron';
 
 import DeviceConnection from './DeviceConnection';
 import type { CompleteScanData, ScanConfig } from './parser';
-import ControlPanel, { defaultConfig } from './ControlPanel';
+import ControlPanel from './ControlPanel';
 import type { JsonConfig } from './ControlPanel';
 
 import { Refresh } from '@mui/icons-material';
 import ScanChart from './ScanChart';
+import { register } from 'module';
 
 const { ipcRenderer } = window.require('electron');
 
@@ -57,7 +58,7 @@ function a11yProps(index: number) {
 const RongbukApp: React.FC = () => {
   // Mediator
   const [onResetClick, setOnResetClick] = useState<() => void>(() => () => {});
-  const onOffResetClick = useCallback((handler: () => void) => {
+  const registerResetConfigHandler = useCallback((handler: () => void) => {
     setOnResetClick(() => handler);
     console.log('RestButtonClick handler on', handler);
     return () => {
@@ -65,6 +66,22 @@ const RongbukApp: React.FC = () => {
       console.log('ResetButtonClick handler off', handler);
     };
   }, []);
+
+  const [applyConfigHandler, setApplyConfigHandler] = useState<
+    () => JsonConfig | null
+  >(() => () => null);
+
+  const registerApplyConfigHandler = useCallback(
+    (handler: () => JsonConfig) => {
+      setApplyConfigHandler(() => handler);
+      console.log('applyConfigHandler registered');
+      return () => {
+        setApplyConfigHandler(() => (): JsonConfig | null => null);
+        console.log('applyConfigHandler unregisterd');
+      };
+    },
+    []
+  );
 
   // Tab state
   const [currentTab, setCurrentTab] = useState(0);
@@ -241,7 +258,10 @@ const RongbukApp: React.FC = () => {
             disabled={!isConnected || isScanning}
             sx={{ ml: 2 }}
             onClick={() => {
-              ipcRenderer.send('user-submit-scan-config', currentConfig);
+              const config = applyConfigHandler();
+              if (config === null) return;
+
+              ipcRenderer.send('user-submit-scan-config', config);
               setProgress(0);
               setNumerator(0);
               setDenominator(0);
@@ -266,19 +286,9 @@ const RongbukApp: React.FC = () => {
         {/* Configuration Tab */}
         <TabPanel value={currentTab} index={1}>
           <ControlPanel
-            // disableSumbit={
-            //   !devices.some(
-            //     dev =>
-            //       dev.connectionState === 'CONNECTED' &&
-            //       Array.isArray(dev.location)
-            //   )
-            // }
-            // onSubmit={(config: JsonConfig) => {
-            //   ipcRenderer.send('user-submit-scan-config', config);
-            //   setCurrentConfig(config);
-            // }}
             onConfigChange={(cfg: JsonConfig) => setCurrentConfig(cfg)}
-            onOffResetClick={onOffResetClick}
+            registerResetConfigHandler={registerResetConfigHandler}
+            registerApplyConfigHandler={registerApplyConfigHandler}
           />
         </TabPanel>
 

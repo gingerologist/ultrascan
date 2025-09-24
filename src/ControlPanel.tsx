@@ -1,10 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Box,
-  Paper,
   Typography,
-  Button,
-  Stack,
   Select,
   MenuItem,
   Slider,
@@ -14,10 +11,10 @@ import {
   TableCell,
 } from '@mui/material';
 
-import {
-  ContentCopy as CopyIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+// import {
+//   ContentCopy as CopyIcon,
+//   Refresh as RefreshIcon,
+// } from '@mui/icons-material';
 
 import { useTheme, SxProps } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
@@ -42,11 +39,6 @@ export interface JsonConfig {
   tail: number;
   startUs: number;
   endUs: number;
-}
-
-interface ControlPanelProps {
-  onConfigChange?: (config: JsonConfig) => void;
-  onOffResetClick: (onClick: () => void) => () => void;
 }
 
 // These styles are from official slider customization examples.
@@ -125,9 +117,23 @@ const defaultPattern: PatternUnit[] = Array(16)
       : { range: 2, position: 'none' as const }
   );
 
+interface ControlPanelProps {
+  onConfigChange?: (config: JsonConfig) => void;
+
+  // this register function returns a unregister function
+  // which will be used when current React component is unmounted.
+  // this is how useEffect hooks work.
+  registerResetConfigHandler: (handler: () => void) => () => void;
+
+  // this register function works in a way similar to resetConfig
+  // it differs in that the handler return a config
+  registerApplyConfigHandler: (handler: () => JsonConfig) => () => void;
+}
+
 const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   onConfigChange,
-  onOffResetClick,
+  registerResetConfigHandler,
+  registerApplyConfigHandler,
 }) => {
   const theme = useTheme();
   const iosStyleEx: SxProps = getIOSSliderStyleEx(theme);
@@ -145,19 +151,28 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const [patternUnits, setPatternUnits] =
     useState<PatternUnit[]>(defaultPattern);
 
-  useEffect(
-    () =>
-      onOffResetClick(() => {
-        setConfig(defaultConfig);
-        setPatternUnits(defaultPattern);
-        setAngleRange([0, 0]);
-        setCommittedAngleRange([0, 0]);
-        setSelectedDivisor(2);
-        setAvailableDivisors([]);
-        setSteps(1);
-      }),
-    []
-  );
+  useEffect(() => {
+    return registerResetConfigHandler(() => {
+      setConfig(defaultConfig);
+      setPatternUnits(defaultPattern);
+      setAngleRange([0, 0]);
+      setCommittedAngleRange([0, 0]);
+      setSelectedDivisor(2);
+      setAvailableDivisors([]);
+      setSteps(1);
+    });
+  }, []);
+
+  const configRef = useRef(config);
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  useEffect(() => {
+    return registerApplyConfigHandler(() => {
+      return configRef.current;
+    });
+  }, []);
 
   // Calculate masks for ultrasonic channels based on steps
   const calculateMasks = useCallback((steps: number): number[] => {

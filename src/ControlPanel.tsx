@@ -20,7 +20,6 @@ import { useTheme, SxProps } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 
 import PatternControl from './PatternControl';
-// import type { PatternUnit } from './PatternControl';
 
 // Type definitions matching your schema
 interface JsonAngle {
@@ -105,15 +104,6 @@ const DEFAULTS = {
   tail: 5,
   version: '1.0',
   name: 'noname',
-  // patternUnits: Array(16)
-  //   .fill(null)
-  //   .map((_, index) =>
-  //     index === 0
-  //       ? { range: 5, position: 'top' as const }
-  //       : index === 1
-  //       ? { range: 5, position: 'bottom' as const }
-  //       : { range: 2, position: 'none' as const }
-  //   ) as PatternUnit[],
   pattern: [
     [5, 2],
     [5, 1],
@@ -203,7 +193,7 @@ interface ControlPanelProps {
   registerApplyConfigHandler: (handler: () => JsonConfig) => () => void;
 }
 
-const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
+const ControlPanel: React.FC<ControlPanelProps> = ({
   registerResetConfigHandler,
   registerApplyConfigHandler,
 }) => {
@@ -216,9 +206,6 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   const [repeat, setRepeat] = useState(DEFAULTS.repeat);
   const [tail, setTail] = useState(DEFAULTS.tail);
 
-  // const [patternUnits, setPatternUnits] = useState<PatternUnit[]>(
-  //   DEFAULTS.patternUnits
-  // );
   const [pattern, setPattern] = useState<JsonPatternSegment[]>(
     DEFAULTS.pattern
   );
@@ -303,7 +290,7 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
           selectedDivisorRef.current,
           stepsRef.current
         ),
-        pattern: patternRef.current, // convertPatternUnits(patternUnitsRef.current),
+        pattern: patternRef.current,
         repeat: repeatRef.current,
         tail: tailRef.current,
         startUs: startUsRef.current,
@@ -314,42 +301,6 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
       return config;
     });
   }, []);
-
-  // const convertPatternUnits = (units: PatternUnit[]): JsonPatternSegment[] => {
-  //   const patterns: JsonPatternSegment[] = [];
-
-  //   // Process pattern units until we hit the first 'none' (terminator)
-  //   for (const unit of patternUnits) {
-  //     if (unit.position === 'none') {
-  //       // First 'none' acts as terminator, stop processing
-  //       break;
-  //     }
-
-  //     // Map positions to register values:
-  //     // bottom (negative high voltage) -> 1
-  //     // top (positive high voltage) -> 2
-  //     // middle (ground level) -> 3
-  //     let registerValue: number;
-  //     switch (unit.position) {
-  //       case 'bottom':
-  //         registerValue = 1;
-  //         break;
-  //       case 'top':
-  //         registerValue = 2;
-  //         break;
-  //       case 'middle':
-  //         registerValue = 3;
-  //         break;
-  //       default:
-  //         // This shouldn't happen since we break on 'none', but just in case
-  //         continue;
-  //     }
-
-  //     patterns.push([unit.range, registerValue]);
-  //   }
-
-  //   return patterns;
-  // };
 
   // Handle visual update during dragging (no calculations)
   const handleAngleRangeVisualChange = (
@@ -574,4 +525,4 @@ const UltrasonicControlPanel: React.FC<ControlPanelProps> = ({
   );
 };
 
-export default UltrasonicControlPanel;
+export default ControlPanel;

@@ -7,7 +7,6 @@ import {
   Tab,
   Box,
   Button,
-  FormLabel,
   CircularProgress,
   LinearProgress,
 } from '@mui/material';
@@ -22,7 +21,6 @@ import type { JsonConfig } from './ControlPanel';
 
 import { Refresh } from '@mui/icons-material';
 import ScanChart from './ScanChart';
-import { register } from 'module';
 
 const { ipcRenderer } = window.require('electron');
 
@@ -185,10 +183,10 @@ const RongbukApp: React.FC = () => {
   return (
     <div
       style={{
-        fontFamily: 'Arial, sans-serif',
+        // fontFamily: 'Arial, sans-serif',
         maxWidth: '1200px',
         margin: '0 auto',
-        minHeight: '100vh',
+        // minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -272,7 +270,7 @@ const RongbukApp: React.FC = () => {
       </Box>
 
       {/* Tab Content */}
-      <Box sx={{ flex: 1 }}>
+      <Box>
         {/* Devices Tab */}
         <TabPanel value={currentTab} index={0}>
           <DeviceConnection

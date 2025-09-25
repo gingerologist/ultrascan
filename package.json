@@ -16,7 +16,8 @@
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "jsdoc": "jsdoc -c jsdoc.conf.json"
+    "jsdoc": "jsdoc -c jsdoc.conf.json",
+    "archive": "node archive.js"
   },
   "keywords": [],
   "author": {
@@ -44,6 +45,7 @@
     "@vercel/webpack-asset-relocator-loader": "^1.7.3",
     "@vitest/coverage-v8": "^3.2.0",
     "@vitest/ui": "^3.2.0",
+    "archiver": "^7.0.1",
     "css-loader": "^6.11.0",
     "electron": "36.3.1",
     "electron-devtools-installer": "^4.0.0",

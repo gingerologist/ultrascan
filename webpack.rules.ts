@@ -28,4 +28,9 @@ export const rules: Required<ModuleOptions>['rules'] = [
       },
     },
   },
+  {
+    // this is required for import woff2
+    test: /\.(woff|woff2|eot|ttf|otf)$/i,
+    type: 'asset/resource',
+  },
 ];

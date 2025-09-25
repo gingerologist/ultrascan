@@ -183,10 +183,9 @@ const RongbukApp: React.FC = () => {
   return (
     <div
       style={{
-        // fontFamily: 'Arial, sans-serif',
+        fontFamily: 'Inter, Arial, sans-serif',
         maxWidth: '1200px',
         margin: '0 auto',
-        // minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
       }}

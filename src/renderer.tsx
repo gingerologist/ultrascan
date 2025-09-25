@@ -3,7 +3,17 @@ import { createRoot } from 'react-dom/client';
 import { ThemeProvider, createTheme, Container } from '@mui/material';
 import RongbukApp from './RongbukApp';
 
-const theme = createTheme({});
+import './fonts';
+
+const theme = createTheme({
+  typography: {
+    fontFamily: 'Inter',
+    fontWeightLight: 200,
+    fontWeightRegular: 300,
+    fontWeightMedium: 500,
+    fontWeightBold: 700,
+  },
+});
 const container = document.getElementById('root');
 
 if (container) {

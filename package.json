@@ -17,7 +17,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "jsdoc": "jsdoc -c jsdoc.conf.json",
-    "archive": "node archive.js"
+    "archive": "node scripts/archive.js"
   },
   "keywords": [],
   "author": {

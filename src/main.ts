@@ -12,10 +12,16 @@ import {
 
 import * as net from 'net';
 
-const {
-  default: installExtension,
-  REACT_DEVELOPER_TOOLS,
-} = require('electron-devtools-installer');
+import path from 'path';
+
+if (process.env.NODE_ENV === 'development') {
+
+}
+
+// const {
+//   default: installExtension,
+//   REACT_DEVELOPER_TOOLS,
+// } = require('electron-devtools-installer');
 
 // import { SerialPort } from 'serialport';
 
@@ -109,11 +115,14 @@ parser.onParseError = () => console.log('parser error');
 // plugin that tells the Electron app where to look for the Webpack-bundled app code (depending on
 // whether you're running in development or production).
 
-/**
- * @ignore
- */
-declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
-declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+// Vite构建时的入口文件路径
+// const MAIN_WINDOW_ENTRY = process.env.NODE_ENV === 'development' 
+//   ? 'http://localhost:3000/index.html' 
+//   : path.join(__dirname, '../renderer/index.html');
+
+// These are injected by @electron-forge/plugin-vite
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -219,22 +228,28 @@ const updateMenuSelectDevice = (enabled: boolean): void => {
  * create main window, with extra menucommand
  */
 const createMainWindow = (): void => {
-  installExtension(REACT_DEVELOPER_TOOLS)
-    .then(() => console.log('React DevTools installed'))
-    .catch((e: Error) => console.log(e));
+  // TODO:
+  // installExtension(REACT_DEVELOPER_TOOLS)
+  //   .then(() => console.log('React DevTools installed'))
+  //   .catch((e: Error) => console.log(e));
 
   mainWindow = new BrowserWindow({
-    height: 600,
-    width: 800,
-    webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-  });
+      height: 600,
+      width: 800,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+    });
 
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  // mainWindow.loadURL(MAIN_WINDOW_ENTRY);
   // mainWindow.webContents.openDevTools();
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+  } else {
+    // mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+    mainWindow.loadFile(path.join(__dirname, `../../src/.vite/renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+  }
 
   ipcMain.on('user-refresh-devices', () => {
     console.log('user-refresh-devices');

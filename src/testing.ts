@@ -3,11 +3,11 @@
 import { BrowserWindow, Menu, MenuItem } from 'electron';
 import * as path from 'path';
 
-/**
- * @ignore
- */
-declare const TESTING_WINDOW_WEBPACK_ENTRY: string;
-declare const TESTING_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+// Vite构建时的入口文件路径
+const TESTING_WINDOW_ENTRY = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3000/testing.html' 
+  : path.join(__dirname, '../renderer/testing.html');
+const TESTING_WINDOW_PRELOAD_ENTRY = path.join(__dirname, '../preload/preload.cjs');
 
 let testingWindow: BrowserWindow | null = null;
 
@@ -30,7 +30,7 @@ function createTestingWindow() {
       contextIsolation: false,
       // enableRemoteModule: false,
       // preload: path.join(__dirname, 'preload.js'), // Optional: if you need IPC
-      preload: TESTING_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      preload: TESTING_WINDOW_PRELOAD_ENTRY,
     },
     show: false, // Don't show until ready
   });
@@ -47,7 +47,7 @@ function createTestingWindow() {
 
   testingWindow.setMenu(null);
 
-  testingWindow.loadURL(TESTING_WINDOW_WEBPACK_ENTRY);
+  testingWindow.loadURL(TESTING_WINDOW_ENTRY);
 
   // Show window when ready to prevent visual flash
   testingWindow.once('ready-to-show', () => {

@@ -1,21 +1,29 @@
-import type { ForgeConfig } from '@electron-forge/shared-types';
+import { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
-import { WebpackPlugin } from '@electron-forge/plugin-webpack';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-
-import { mainConfig } from './webpack.main.config';
-import { rendererConfig } from './webpack.renderer.config';
+import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: false,
+    ignore: (path: string) => {
+      if (!path) return false;
+      // Only package these
+      if (path.startsWith('/.vite')) return false;
+      if (path.startsWith('/src')) return false;
+      if (path.startsWith('/node_modules')) return false;
+      if (path.startsWith('/package.json')) return false;
+      // Ignore everything else in root
+      return path.split('/').length === 2 && path.startsWith('/');
+    },
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
@@ -23,41 +31,22 @@ const config: ForgeConfig = {
     new MakerDeb({}),
   ],
   plugins: [
-    new AutoUnpackNativesPlugin({}),
-    new WebpackPlugin({
-      mainConfig,
-      renderer: {
-        config: rendererConfig,
-        entryPoints: [
-          {
-            name: 'main_window',
-            html: './src/index.html',
-            js: './src/renderer.tsx',
-            preload: {
-              js: './src/preload.ts',
-            },
-          },
-          {
-            name: 'modal_window', // the order of the property matters
-            html: './src/modal.html',
-            js: './src/modal.tsx', // there must be one file designated.
-            preload: {
-              js: './src/preload.ts',
-            },
-          },
-          {
-            name: 'testing_window',
-            html: './src/testing.html',
-            js: './src/testing.tsx',
-            preload: {
-              js: './src/preload.ts',
-            },
-          },
-        ],
-      },
+    // new AutoUnpackNativesPlugin({}),
+    new VitePlugin({
+      build: [
+        {
+          entry: 'src/main.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
+      ],
+      renderer: [
+        {
+          name: 'main_window',
+          config: 'vite.renderer.config.ts',
+        },
+      ],
     }),
-    // Fuses are used to enable/disable various Electron functionality
-    // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,
@@ -65,7 +54,7 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: false,
     }),
   ],
 };

@@ -205,6 +205,8 @@ export class UltrasonicDataParser {
       | { type: 'metadata'; scanId: number; config: ScanConfig }
       | { type: 'data'; packet: DataPacket }
   ): void {
+    console.log(`handlePacket(), packet.type: ${packet.type}`);
+
     if (packet.type === 'metadata') {
       // Start new scan
       this.currentScan = {

@@ -21,6 +21,7 @@ import type { Theme } from '@mui/material/styles';
 
 import PatternControl from './PatternControl';
 import RxApodizationTable from './RxApodizationTable';
+import TxApodization from './TxApodization';
 
 // Type definitions matching your schema
 interface JsonAngle {
@@ -39,6 +40,7 @@ export interface JsonConfig {
   tail: number;
   startUs: number;
   endUs: number;
+  txApodization: number[][];
 }
 
 // These styles are from official slider customization examples.
@@ -110,6 +112,7 @@ const DEFAULTS = {
     [5, 1],
   ] as JsonPatternSegment[],
   rxApodization: Array.from({ length: 64 }, (_, i) => i),
+  txApodization: Array.from({ length: 8 }, () => []),
 };
 
 const calculateDivisors = (range: number): number[] => {
@@ -226,6 +229,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [rxApodization, setRxApodization] = useState<number[]>(
     DEFAULTS.rxApodization
   );
+  const [txApodization, setTxApodization] = useState<number[][]>(
+    DEFAULTS.txApodization
+  );
 
   const startUsRef = useRef(startUs);
   useEffect(() => {
@@ -267,6 +273,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     stepsRef.current = steps;
   }, [steps]);
 
+  const rxApodizationRef = useRef(rxApodization);
+  useEffect(() => {
+    rxApodizationRef.current = rxApodization;
+  }, [rxApodization]);
+
+  const txApodizationRef = useRef(txApodization);
+  useEffect(() => {
+    txApodizationRef.current = txApodization;
+  }, [txApodization]);
+
   const availableDivisors = useMemo(() => {
     const range = Math.abs(committedAngleRange[1] - committedAngleRange[0]);
     return calculateDivisors(range);
@@ -284,6 +300,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       setSelectedDivisor(DEFAULTS.selectedDivisor);
       setSteps(DEFAULTS.steps);
       setRxApodization(DEFAULTS.rxApodization);
+      setTxApodization(DEFAULTS.txApodization);
     });
   }, []);
 
@@ -312,6 +329,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         tail: tailRef.current,
         startUs: startUsRef.current,
         endUs: endUsRef.current,
+        txApodization: txApodizationRef.current,
       };
 
       console.log(config);
@@ -537,12 +555,26 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </TableCell>
           </TableRow>
           <TableRow sx={rxApodizationRowSx}>
-            {/* rx Apodization Control */}
-            <LabelCell label="RX Apodization" />
-            <TableCell sx={{ verticalAlign: 'top', pt: 2 }}>
+            {/* tx Apodization Control */}
+            <LabelCell label="TX Apodization" />
+            <TableCell colSpan={2} sx={{ verticalAlign: 'top', pt: 2 }}>
               <Box sx={{ mt: 0, mb: 1 }}>
                 <Box sx={{ pl: 0 }}>
-                  <RxApodizationTable 
+                  <TxApodization
+                    txApodization={txApodization}
+                    setTxApodization={setTxApodization}
+                  />
+                </Box>
+              </Box>
+            </TableCell>
+          </TableRow>
+          <TableRow sx={rxApodizationRowSx}>
+            {/* rx Apodization Control */}
+            <LabelCell label="RX Apodization" />
+            <TableCell colSpan={2} sx={{ verticalAlign: 'top', pt: 2 }}>
+              <Box sx={{ mt: 0, mb: 1 }}>
+                <Box sx={{ pl: 0 }}>
+                  <RxApodizationTable
                     rxApodization={rxApodization}
                     setRxApodization={setRxApodization}
                     defaults={{ rxApodization: DEFAULTS.rxApodization }}

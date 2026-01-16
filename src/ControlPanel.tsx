@@ -479,7 +479,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </TableRow>
 
           {/* Steps Row */}
-          <TableRow sx={tableRowSx}>
+          <TableRow sx={{ ...tableRowSx, display: 'none' }}>
             <LabelCell label="Steps" />
             <TableCell colSpan={1} sx={{ verticalAlign: 'bottom' }}>
               <Slider

@@ -1,6 +1,3 @@
-// Simplified ultrasonic detection system data parser
-// All-or-none approach - only emits complete scan data
-
 const PACKET_PREAMBLE = 0xa5a5a5a5;
 const SIZEOF_PACKET_PREAMBLE = 4;
 const SIZEOF_PACKET_HEADER_T = 8;
@@ -21,6 +18,7 @@ export interface ScanConfig {
   angles: { label: string; numSteps: number }[];
   numAngles: number;
   totalSteps: number;
+  rxApodization: number[];
 }
 
 export interface ChannelData {
@@ -173,6 +171,7 @@ export class UltrasonicDataParser {
             angles,
             numAngles: jconf.angles.length,
             totalSteps,
+            rxApodization: jconf.rxApodization || Array.from({ length: 64 }, (_, i) => i),
           };
 
           return { type: 'metadata', scanId, config };
@@ -205,7 +204,7 @@ export class UltrasonicDataParser {
       | { type: 'metadata'; scanId: number; config: ScanConfig }
       | { type: 'data'; packet: DataPacket }
   ): void {
-    console.log(`handlePacket(), packet.type: ${packet.type}`);
+    // console.log(`handlePacket(), packet.type: ${packet.type}`);
 
     if (packet.type === 'metadata') {
       // Start new scan
@@ -213,7 +212,8 @@ export class UltrasonicDataParser {
         scanId: packet.scanId,
         config: packet.config,
         dataPackets: new Map(),
-        totalExpectedPackets: packet.config.totalSteps * 64, // 64 channels, no baseline
+        // totalExpectedPackets: packet.config.totalSteps * 64, // 64 channels, no baseline
+        totalExpectedPackets: packet.config.totalSteps * packet.config.rxApodization.length
       };
 
       console.log(
@@ -234,6 +234,10 @@ export class UltrasonicDataParser {
 
       const dataKey = `${packet.packet.angleIndex}_${packet.packet.stepIndex}_${packet.packet.channelIndex}`;
       this.currentScan.dataPackets.set(dataKey, packet.packet);
+
+      console.log(
+        `parser, handle data packet ${dataKey}, ${this.currentScan.dataPackets.size} / ${this.currentScan.totalExpectedPackets}`, 
+      );
 
       this.onPacketReceived?.(this.currentScan.dataPackets.size);
 

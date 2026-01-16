@@ -100,7 +100,7 @@ const DEFAULTS = {
 
   startUs: 40,
   endUs: 80,
-  repeat: 2,
+  repeat: 1,
   tail: 5,
   version: '1.0',
   name: 'noname',
@@ -108,6 +108,7 @@ const DEFAULTS = {
     [5, 2],
     [5, 1],
   ] as JsonPatternSegment[],
+  rxApodization: Array.from({ length: 64 }, (_, i) => i),
 };
 
 const calculateDivisors = (range: number): number[] => {
@@ -200,6 +201,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const theme = useTheme();
   const iosStyleEx: SxProps = getIOSSliderStyleEx(theme);
   const tableRowSx: SxProps = { height: 136 };
+  const rxApodizationRowSx: SxProps = { minHeight: 136, height: 'auto' };
 
   const [startUs, setStartUs] = useState(DEFAULTS.startUs);
   const [endUs, setEndUs] = useState(DEFAULTS.endUs);
@@ -220,6 +222,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     DEFAULTS.selectedDivisor
   );
   const [steps, setSteps] = useState(DEFAULTS.steps);
+  const [rxApodization, setRxApodization] = useState<number[]>(DEFAULTS.rxApodization);
 
   const startUsRef = useRef(startUs);
   useEffect(() => {
@@ -234,7 +237,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const repeatRef = useRef(repeat);
   useEffect(() => {
     repeatRef.current = repeat;
-  }, []);
+  }, [repeat]);
 
   const tailRef = useRef(tail);
   useEffect(() => {
@@ -277,12 +280,212 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       setCommittedAngleRange(DEFAULTS.committedAngleRange);
       setSelectedDivisor(DEFAULTS.selectedDivisor);
       setSteps(DEFAULTS.steps);
+      setRxApodization(DEFAULTS.rxApodization);
     });
   }, []);
 
+  // Handle rxApodization checkbox toggle
+  const handleRxApodizationToggle = (channelIndex: number) => {
+    setRxApodization(prev => {
+      const newSelected = prev.includes(channelIndex)
+        ? prev.filter(idx => idx !== channelIndex)
+        : [...prev, channelIndex].sort((a, b) => a - b);
+      return newSelected;
+    });
+  };
+
+  
+
+  // Generate custom table for rxApodization (5 rows × 17 columns)
+  const generateRxApodizationTable = () => {
+    // Table dimensions
+    const ROWS = 5;
+    const COLS = 17;
+    
+    // Handle table cell click
+    const handleCellClick = (row: number, col: number) => {
+      if (row === 0 && col === 0) {
+        // Top-left corner: Select all
+        const isAllSelected = rxApodization.length === 64;
+        setRxApodization(isAllSelected ? [] : DEFAULTS.rxApodization);
+      } else if (row === 0) {
+        // First row: Select column
+        let isColSelected = true;
+        for (let r = 1; r < ROWS; r++) {
+          const channelIndex = (r - 1) * 16 + (col - 1);
+          if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
+            isColSelected = false;
+            break;
+          }
+        }
+        
+        const newSelected = [...rxApodization];
+        for (let r = 1; r < ROWS; r++) {
+          const channelIndex = (r - 1) * 16 + (col - 1);
+          if (channelIndex >= 64) continue;
+          
+          if (isColSelected) {
+            // Deselect column
+            const index = newSelected.indexOf(channelIndex);
+            if (index !== -1) {
+              newSelected.splice(index, 1);
+            }
+          } else {
+            // Select column
+            if (!newSelected.includes(channelIndex)) {
+              newSelected.push(channelIndex);
+            }
+          }
+        }
+        
+        setRxApodization(newSelected.sort((a, b) => a - b));
+      } else if (col === 0) {
+        // First column: Select row
+        let isRowSelected = true;
+        for (let c = 1; c < COLS; c++) {
+          const channelIndex = (row - 1) * 16 + (c - 1);
+          if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
+            isRowSelected = false;
+            break;
+          }
+        }
+        
+        const newSelected = [...rxApodization];
+        for (let c = 1; c < COLS; c++) {
+          const channelIndex = (row - 1) * 16 + (c - 1);
+          if (channelIndex >= 64) continue;
+          
+          if (isRowSelected) {
+            // Deselect row
+            const index = newSelected.indexOf(channelIndex);
+            if (index !== -1) {
+              newSelected.splice(index, 1);
+            }
+          } else {
+            // Select row
+            if (!newSelected.includes(channelIndex)) {
+              newSelected.push(channelIndex);
+            }
+          }
+        }
+        
+        setRxApodization(newSelected.sort((a, b) => a - b));
+      } else {
+        // Data cell: Toggle single channel
+        const channelIndex = (row - 1) * 16 + (col - 1);
+        if (channelIndex < 64) {
+          handleRxApodizationToggle(channelIndex);
+        }
+      }
+    };
+    
+    // Check if a column is fully selected
+    const isColumnSelected = (col: number) => {
+      for (let r = 1; r < ROWS; r++) {
+        const channelIndex = (r - 1) * 16 + (col - 1);
+        if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
+          return false;
+        }
+      }
+      return true;
+    };
+    
+    // Check if a row is fully selected
+    const isRowSelected = (row: number) => {
+      for (let c = 1; c < COLS; c++) {
+        const channelIndex = (row - 1) * 16 + (c - 1);
+        if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
+          return false;
+        }
+      }
+      return true;
+    };
+    
+    // Check if a cell is selected
+    const isCellSelected = (row: number, col: number) => {
+      if (row === 0 && col === 0) {
+        return rxApodization.length === 64;
+      } else if (row === 0) {
+        return isColumnSelected(col);
+      } else if (col === 0) {
+        return isRowSelected(row);
+      } else {
+        const channelIndex = (row - 1) * 16 + (col - 1);
+        return rxApodization.includes(channelIndex);
+      }
+    };
+    
+    // Render the table
+    return (
+      <Box sx={{ width: '100%', border: '0px solid #e0e0e0', borderRadius: 1, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Generate table rows */}
+          {Array.from({ length: ROWS }, (_, row) => (
+            <Box key={row} sx={{ display: 'flex' }}>
+              {/* Generate table columns */}
+              {Array.from({ length: COLS }, (_, col) => {
+                const isSelected = isCellSelected(row, col);
+                const isHeaderCell = row === 0 || col === 0;
+                const channelIndex = (row - 1) * 16 + (col - 1);
+                const isValidChannel = channelIndex < 64;
+                
+                // Determine cell content and styling
+                const cellContent = isHeaderCell ? '✔' : (isValidChannel ? channelIndex : null);
+                const cellSx = {
+                  width: col === 0 ? '40px' : '32px',
+                  height: row === 0 ? '32px' : '32px',
+                  border: '1px solid #e0e0e0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: isValidChannel ? 'pointer' : 'default',
+                  fontSize: '0.7rem',
+                  fontWeight: isHeaderCell ? 'normal' : 'normal',
+                };
+                
+                // Apply different styles for header cells vs data cells
+                if (isHeaderCell) {
+                  // Header cells (first row and first column) use circle indicators
+                  Object.assign(cellSx, {
+                    backgroundColor: '#f5f5f5',
+                    color: isSelected ? '#007bff' : '#9e9e9e',
+                    '&:hover': {
+                      backgroundColor: isValidChannel ? '#e0e0e0' : '#f5f5f5',
+                      color: isValidChannel ? (isSelected ? '#0056b3' : '#757575') : '#9e9e9e',
+                    },
+                  });
+                } else {
+                  // Data cells use background color for selection
+                  Object.assign(cellSx, {
+                    backgroundColor: isSelected ? '#007bff' : '#f5f5f5',
+                    color: isSelected ? 'white' : 'inherit',
+                    '&:hover': {
+                      backgroundColor: isValidChannel ? (isSelected ? '#0056b3' : '#e0e0e0') : '#f5f5f5',
+                    },
+                  });
+                }
+                
+                return (
+                  <Box
+                    style={{width: '100%'}}
+                    key={`${row}-${col}`}
+                    sx={cellSx}
+                    onClick={() => isValidChannel && handleCellClick(row, col)}
+                  >
+                    {cellContent}
+                  </Box>
+                );
+              })}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
   useEffect(() => {
     return registerApplyConfigHandler(() => {
-      let config = {
+      const config = {
         version: DEFAULTS.version,
         name: DEFAULTS.name,
         angles: calculateAngles(
@@ -500,7 +703,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               <Slider
                 value={[startUs, endUs]}
                 onChange={(_, value: number | number[]) => {
-                  let [start, end] = value as [number, number];
+                  const [start, end] = value as [number, number];
                   setStartUs(start);
                   setEndUs(end);
                 }}
@@ -519,8 +722,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               />
             </TableCell>
           </TableRow>
+          <TableRow sx={rxApodizationRowSx}>
+            {/* rx Apodization Control */}
+            <LabelCell label="RX Apodization" />
+            <TableCell sx={{ verticalAlign: 'top', pt: 2 }}>
+
+            <Box sx={{ mt: 0, mb: 1 }}>
+              <Box sx={{ pl: 0 }}>
+                {generateRxApodizationTable()}
+              </Box>
+            </Box>
+            </TableCell>
+          </TableRow>
+
         </TableBody>
       </Table>
+
+
     </Box>
   );
 };

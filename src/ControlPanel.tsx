@@ -354,6 +354,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         startUs: startUsRef.current,
         endUs: endUsRef.current,
         txApodization: txApodizationRef.current,
+        rxApodization: rxApodizationRef.current,
       };
 
       console.log(config);

@@ -294,14 +294,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // Validate the control panel data
   useEffect(() => {
-    // Validate based only on RxApodization: at least one cell must be selected
+    // Validate both TxApodization and RxApodization: at least one cell must be selected in each
     // Check if any value in rxApodization array is 1
-    const isValid = rxApodization.some(value => value === 1);
+    const isRxValid = rxApodization.some(value => value === 1);
+
+    // Check if any value in any row of txApodization is 1
+    const isTxValid = txApodization.some(row => row.some(value => value === 1));
+
+    // Both must be valid for the control panel to be valid
+    const isValid = isRxValid && isTxValid;
 
     // Notify parent component about validity change
     onValidityChange(isValid);
   }, [
     rxApodization,
+    txApodization,
     onValidityChange
   ]);
 
@@ -573,7 +580,29 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </TableRow>
           <TableRow sx={rxApodizationRowSx}>
             {/* tx Apodization Control */}
-            <LabelCell label="TX Apodization" />
+            <TableCell sx={{ width: '20%', verticalAlign: 'middle', pr: 3 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  fontWeight="medium"
+                >
+                  TX Apodization
+                </Typography>
+                {/* Calculate and display number of selected rows */}
+                {(() => {
+                  const selectedRows = txApodization.filter(row => row.some(value => value === 1)).length;
+                  return (
+                    <Typography
+                      variant="caption"
+                      color={selectedRows === 0 ? 'error' : 'text.secondary'}
+                    >
+                      ({selectedRows} steps)
+                    </Typography>
+                  );
+                })()}
+              </Box>
+            </TableCell>
             <TableCell colSpan={2} sx={{ verticalAlign: 'top', pt: 2 }}>
               <Box sx={{ mt: 0, mb: 1 }}>
                 <Box sx={{ pl: 0 }}>
@@ -587,7 +616,29 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </TableRow>
           <TableRow sx={rxApodizationRowSx}>
             {/* rx Apodization Control */}
-            <LabelCell label="RX Apodization" />
+            <TableCell sx={{ width: '20%', verticalAlign: 'middle', pr: 3 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Typography
+                  variant="subtitle2"
+                  color="text.secondary"
+                  fontWeight="medium"
+                >
+                  RX Apodization
+                </Typography>
+                {/* Calculate and display number of selected channels */}
+                {(() => {
+                  const selectedChannels = rxApodization.filter(value => value === 1).length;
+                  return (
+                    <Typography
+                      variant="caption"
+                      color={selectedChannels === 0 ? 'error' : 'text.secondary'}
+                    >
+                      ({selectedChannels} channels)
+                    </Typography>
+                  );
+                })()}
+              </Box>
+            </TableCell>
             <TableCell colSpan={2} sx={{ verticalAlign: 'top', pt: 2 }}>
               <Box sx={{ mt: 0, mb: 1 }}>
                 <Box sx={{ pl: 0 }}>

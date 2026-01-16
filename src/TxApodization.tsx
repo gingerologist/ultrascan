@@ -20,39 +20,35 @@ const TxApodization: React.FC<TxApodizationProps> = ({
   const handleCellClick = (row: number, col: number) => {
     if (col === 0) {
       // First column: Select/deselect entire row
-      const isRowSelected = txApodization[row].length === 32;
-
+      const isRowSelected = txApodization[row].every(value => value === 1);
+      
       if (isRowSelected) {
-        // Deselect entire row
+        // Deselect entire row (set all to 0)
         setTxApodization(prev => {
           const newState = [...prev];
-          newState[row] = [];
+          newState[row] = Array.from({ length: 32 }, () => 0);
           return newState;
         });
       } else {
-        // Select entire row (fill with 0-31)
+        // Select entire row (set all to 1)
         setTxApodization(prev => {
           const newState = [...prev];
-          newState[row] = Array.from({ length: 32 }, (_, i) => i);
+          newState[row] = Array.from({ length: 32 }, () => 1);
           return newState;
         });
       }
     } else {
       // Data cell: Toggle single channel (0-31)
       const channelIndex = col - 1;
-
+      
       setTxApodization(prev => {
         const newState = [...prev];
         const rowData = [...newState[row]];
-
-        if (rowData.includes(channelIndex)) {
-          // Deselect channel
-          newState[row] = rowData.filter(idx => idx !== channelIndex).sort((a, b) => a - b);
-        } else {
-          // Select channel
-          newState[row] = [...rowData, channelIndex].sort((a, b) => a - b);
-        }
-
+        
+        // Toggle the value (0 ↔ 1)
+        rowData[channelIndex] = rowData[channelIndex] === 1 ? 0 : 1;
+        newState[row] = rowData;
+        
         return newState;
       });
     }
@@ -60,7 +56,7 @@ const TxApodization: React.FC<TxApodizationProps> = ({
 
   // Check if a row is fully selected
   const isRowSelected = (row: number) => {
-    return txApodization[row].length === 32;
+    return txApodization[row].every(value => value === 1);
   };
 
   // Check if a cell is selected
@@ -69,7 +65,7 @@ const TxApodization: React.FC<TxApodizationProps> = ({
       return isRowSelected(row);
     } else {
       const channelIndex = col - 1;
-      return txApodization[row].includes(channelIndex);
+      return txApodization[row][channelIndex] === 1;
     }
   };
 

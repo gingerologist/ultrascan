@@ -112,7 +112,7 @@ const DEFAULTS = {
     [5, 1],
   ] as JsonPatternSegment[],
   rxApodization: Array.from({ length: 64 }, (_, i) => i),
-  txApodization: Array.from({ length: 8 }, () => []),
+  txApodization: Array.from({ length: 8 }, () => Array.from({ length: 32 }, () => 0)),
 };
 
 const calculateDivisors = (range: number): number[] => {

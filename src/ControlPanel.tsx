@@ -294,35 +294,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // Validate the control panel data
   useEffect(() => {
-    // Comprehensive validation logic
-    const isValid =
-      // Window range validation: startUs must be less than endUs
-      startUs < endUs &&
-
-      // Steps validation: must be at least 1
-      steps >= 1 &&
-
-      // Pattern validation: must have at least one segment
-      pattern.length > 0 &&
-
-      // Angle range validation: values must be within bounds
-      angleRange[0] >= -45 && angleRange[0] <= 45 &&
-      angleRange[1] >= -45 && angleRange[1] <= 45;
+    // Validate based only on RxApodization: at least one cell must be selected
+    // Check if any value in rxApodization array is 1
+    const isValid = rxApodization.some(value => value === 1);
 
     // Notify parent component about validity change
     onValidityChange(isValid);
   }, [
-    startUs,
-    endUs,
-    repeat,
-    tail,
-    pattern,
-    angleRange,
-    committedAngleRange,
-    selectedDivisor,
-    steps,
     rxApodization,
-    txApodization,
     onValidityChange
   ]);
 

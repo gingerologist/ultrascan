@@ -55,12 +55,12 @@ function a11yProps(index: number) {
 
 const RongbukApp: React.FC = () => {
   // Mediator
-  const [onResetClick, setOnResetClick] = useState<() => void>(() => () => {});
+  const [onResetClick, setOnResetClick] = useState<() => void>(() => () => { });
   const registerResetConfigHandler = useCallback((handler: () => void) => {
     setOnResetClick(() => handler);
     console.log('RestButtonClick handler on', handler);
     return () => {
-      setOnResetClick(() => () => {});
+      setOnResetClick(() => () => { });
       console.log('ResetButtonClick handler off', handler);
     };
   }, []);
@@ -92,6 +92,9 @@ const RongbukApp: React.FC = () => {
   const [progress, setProgress] = useState<number>(100);
   const [numerator, setNumerator] = useState<number>(0);
   const [denominator, setDenominator] = useState<number>(0);
+
+  // Control panel validity state
+  const [isControlPanelValid, setIsControlPanelValid] = useState(true);
 
   const denom = useRef(denominator);
   useEffect(() => {
@@ -251,7 +254,7 @@ const RongbukApp: React.FC = () => {
 
         {currentTab == 1 && (
           <Button
-            disabled={!isConnected || isScanning}
+            disabled={!isConnected || isScanning || !isControlPanelValid}
             sx={{ ml: 2 }}
             onClick={() => {
               const config = applyConfigHandler();
@@ -284,6 +287,7 @@ const RongbukApp: React.FC = () => {
           <ControlPanel
             registerResetConfigHandler={registerResetConfigHandler}
             registerApplyConfigHandler={registerApplyConfigHandler}
+            onValidityChange={setIsControlPanelValid}
           />
         </TabPanel>
 

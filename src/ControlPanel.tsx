@@ -111,7 +111,7 @@ const DEFAULTS = {
     [5, 2],
     [5, 1],
   ] as JsonPatternSegment[],
-  rxApodization: Array.from({ length: 64 }, (_, i) => i),
+  rxApodization: Array.from({ length: 64 }, () => 1),
   txApodization: Array.from({ length: 8 }, () => Array.from({ length: 32 }, () => 0)),
 };
 
@@ -196,11 +196,15 @@ interface ControlPanelProps {
   // this register function works in a way similar to resetConfig
   // it differs in that the handler return a config
   registerApplyConfigHandler: (handler: () => JsonConfig) => () => void;
+
+  // callback to notify parent component about validity changes
+  onValidityChange: (isValid: boolean) => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   registerResetConfigHandler,
   registerApplyConfigHandler,
+  onValidityChange,
 }) => {
   const theme = useTheme();
   const iosStyleEx: SxProps = getIOSSliderStyleEx(theme);
@@ -288,6 +292,40 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return calculateDivisors(range);
   }, [committedAngleRange]);
 
+  // Validate the control panel data
+  useEffect(() => {
+    // Comprehensive validation logic
+    const isValid =
+      // Window range validation: startUs must be less than endUs
+      startUs < endUs &&
+
+      // Steps validation: must be at least 1
+      steps >= 1 &&
+
+      // Pattern validation: must have at least one segment
+      pattern.length > 0 &&
+
+      // Angle range validation: values must be within bounds
+      angleRange[0] >= -45 && angleRange[0] <= 45 &&
+      angleRange[1] >= -45 && angleRange[1] <= 45;
+
+    // Notify parent component about validity change
+    onValidityChange(isValid);
+  }, [
+    startUs,
+    endUs,
+    repeat,
+    tail,
+    pattern,
+    angleRange,
+    committedAngleRange,
+    selectedDivisor,
+    steps,
+    rxApodization,
+    txApodization,
+    onValidityChange
+  ]);
+
   useEffect(() => {
     return registerResetConfigHandler(() => {
       setStartUs(DEFAULTS.startUs);
@@ -307,9 +345,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   // Handle rxApodization checkbox toggle
   const handleRxApodizationToggle = (channelIndex: number) => {
     setRxApodization(prev => {
-      const newSelected = prev.includes(channelIndex)
-        ? prev.filter(idx => idx !== channelIndex)
-        : [...prev, channelIndex].sort((a, b) => a - b);
+      const newSelected = [...prev];
+      // Toggle the value (0 ↔ 1)
+      newSelected[channelIndex] = newSelected[channelIndex] === 1 ? 0 : 1;
       return newSelected;
     });
   };

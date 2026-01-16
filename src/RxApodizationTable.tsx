@@ -24,78 +24,48 @@ const RxApodizationTable: React.FC<RxApodizationTableProps> = ({
   const handleCellClick = (row: number, col: number) => {
     if (row === 0 && col === 0) {
       // Top-left corner: Select all
-      const isAllSelected = rxApodization.length === 64;
-      setRxApodization(isAllSelected ? [] : defaults.rxApodization);
+      const isAllSelected = rxApodization.every(value => value === 1);
+      setRxApodization(isAllSelected ? Array.from({ length: 64 }, () => 0) : defaults.rxApodization);
     } else if (row === 0) {
       // First row: Select column
-      let isColSelected = true;
-      for (let r = 1; r < ROWS; r++) {
-        const channelIndex = (r - 1) * 16 + (col - 1);
-        if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
-          isColSelected = false;
-          break;
-        }
-      }
+      const isColSelected = Array.from({ length: ROWS - 1 }, (_, r) => {
+        const channelIndex = (r) * 16 + (col - 1);
+        return channelIndex < 64 && rxApodization[channelIndex] === 1;
+      }).every(Boolean);
 
       const newSelected = [...rxApodization];
       for (let r = 1; r < ROWS; r++) {
         const channelIndex = (r - 1) * 16 + (col - 1);
         if (channelIndex >= 64) continue;
 
-        if (isColSelected) {
-          // Deselect column
-          const index = newSelected.indexOf(channelIndex);
-          if (index !== -1) {
-            newSelected.splice(index, 1);
-          }
-        } else {
-          // Select column
-          if (!newSelected.includes(channelIndex)) {
-            newSelected.push(channelIndex);
-          }
-        }
+        newSelected[channelIndex] = isColSelected ? 0 : 1;
       }
 
-      setRxApodization(newSelected.sort((a, b) => a - b));
+      setRxApodization(newSelected);
     } else if (col === 0) {
       // First column: Select row
-      let isRowSelected = true;
-      for (let c = 1; c < COLS; c++) {
-        const channelIndex = (row - 1) * 16 + (c - 1);
-        if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
-          isRowSelected = false;
-          break;
-        }
-      }
+      const isRowSelected = Array.from({ length: COLS - 1 }, (_, c) => {
+        const channelIndex = (row - 1) * 16 + (c);
+        return channelIndex < 64 && rxApodization[channelIndex] === 1;
+      }).every(Boolean);
 
       const newSelected = [...rxApodization];
       for (let c = 1; c < COLS; c++) {
         const channelIndex = (row - 1) * 16 + (c - 1);
         if (channelIndex >= 64) continue;
 
-        if (isRowSelected) {
-          // Deselect row
-          const index = newSelected.indexOf(channelIndex);
-          if (index !== -1) {
-            newSelected.splice(index, 1);
-          }
-        } else {
-          // Select row
-          if (!newSelected.includes(channelIndex)) {
-            newSelected.push(channelIndex);
-          }
-        }
+        newSelected[channelIndex] = isRowSelected ? 0 : 1;
       }
 
-      setRxApodization(newSelected.sort((a, b) => a - b));
+      setRxApodization(newSelected);
     } else {
       // Data cell: Toggle single channel
       const channelIndex = (row - 1) * 16 + (col - 1);
       if (channelIndex < 64) {
         setRxApodization(prev => {
-          const newSelected = prev.includes(channelIndex)
-            ? prev.filter(idx => idx !== channelIndex)
-            : [...prev, channelIndex].sort((a, b) => a - b);
+          const newSelected = [...prev];
+          // Toggle the value (0 ↔ 1)
+          newSelected[channelIndex] = newSelected[channelIndex] === 1 ? 0 : 1;
           return newSelected;
         });
       }
@@ -106,7 +76,7 @@ const RxApodizationTable: React.FC<RxApodizationTableProps> = ({
   const isColumnSelected = (col: number) => {
     for (let r = 1; r < ROWS; r++) {
       const channelIndex = (r - 1) * 16 + (col - 1);
-      if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
+      if (channelIndex < 64 && rxApodization[channelIndex] !== 1) {
         return false;
       }
     }
@@ -117,7 +87,7 @@ const RxApodizationTable: React.FC<RxApodizationTableProps> = ({
   const isRowSelected = (row: number) => {
     for (let c = 1; c < COLS; c++) {
       const channelIndex = (row - 1) * 16 + (c - 1);
-      if (channelIndex < 64 && !rxApodization.includes(channelIndex)) {
+      if (channelIndex < 64 && rxApodization[channelIndex] !== 1) {
         return false;
       }
     }
@@ -127,14 +97,14 @@ const RxApodizationTable: React.FC<RxApodizationTableProps> = ({
   // Check if a cell is selected
   const isCellSelected = (row: number, col: number) => {
     if (row === 0 && col === 0) {
-      return rxApodization.length === 64;
+      return rxApodization.every(value => value === 1);
     } else if (row === 0) {
       return isColumnSelected(col);
     } else if (col === 0) {
       return isRowSelected(row);
     } else {
       const channelIndex = (row - 1) * 16 + (col - 1);
-      return rxApodization.includes(channelIndex);
+      return channelIndex < 64 && rxApodization[channelIndex] === 1;
     }
   };
 

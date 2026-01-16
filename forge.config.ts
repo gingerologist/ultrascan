@@ -10,7 +10,9 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: false,
+    asar: {
+      unpack: '**/@serialport/**',
+    },
     ignore: (path: string) => {
       if (!path) return false;
       // Only package these
@@ -21,6 +23,7 @@ const config: ForgeConfig = {
       // Ignore everything else in root
       return path.split('/').length === 2 && path.startsWith('/');
     },
+    // asar: true
   },
   rebuildConfig: {
   },
@@ -31,7 +34,7 @@ const config: ForgeConfig = {
     new MakerDeb({}),
   ],
   plugins: [
-    // new AutoUnpackNativesPlugin({}),
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       build: [
         {

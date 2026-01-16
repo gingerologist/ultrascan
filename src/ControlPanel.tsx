@@ -222,7 +222,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     DEFAULTS.selectedDivisor
   );
   const [steps, setSteps] = useState(DEFAULTS.steps);
-  const [rxApodization, setRxApodization] = useState<number[]>(DEFAULTS.rxApodization);
+  const [rxApodization, setRxApodization] = useState<number[]>(
+    DEFAULTS.rxApodization
+  );
 
   const startUsRef = useRef(startUs);
   useEffect(() => {
@@ -294,14 +296,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     });
   };
 
-  
-
   // Generate custom table for rxApodization (5 rows × 17 columns)
   const generateRxApodizationTable = () => {
     // Table dimensions
     const ROWS = 5;
     const COLS = 17;
-    
+
     // Handle table cell click
     const handleCellClick = (row: number, col: number) => {
       if (row === 0 && col === 0) {
@@ -318,12 +318,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             break;
           }
         }
-        
+
         const newSelected = [...rxApodization];
         for (let r = 1; r < ROWS; r++) {
           const channelIndex = (r - 1) * 16 + (col - 1);
           if (channelIndex >= 64) continue;
-          
+
           if (isColSelected) {
             // Deselect column
             const index = newSelected.indexOf(channelIndex);
@@ -337,7 +337,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             }
           }
         }
-        
+
         setRxApodization(newSelected.sort((a, b) => a - b));
       } else if (col === 0) {
         // First column: Select row
@@ -349,12 +349,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             break;
           }
         }
-        
+
         const newSelected = [...rxApodization];
         for (let c = 1; c < COLS; c++) {
           const channelIndex = (row - 1) * 16 + (c - 1);
           if (channelIndex >= 64) continue;
-          
+
           if (isRowSelected) {
             // Deselect row
             const index = newSelected.indexOf(channelIndex);
@@ -368,7 +368,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             }
           }
         }
-        
+
         setRxApodization(newSelected.sort((a, b) => a - b));
       } else {
         // Data cell: Toggle single channel
@@ -378,7 +378,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         }
       }
     };
-    
+
     // Check if a column is fully selected
     const isColumnSelected = (col: number) => {
       for (let r = 1; r < ROWS; r++) {
@@ -389,7 +389,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       }
       return true;
     };
-    
+
     // Check if a row is fully selected
     const isRowSelected = (row: number) => {
       for (let c = 1; c < COLS; c++) {
@@ -400,7 +400,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       }
       return true;
     };
-    
+
     // Check if a cell is selected
     const isCellSelected = (row: number, col: number) => {
       if (row === 0 && col === 0) {
@@ -414,10 +414,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         return rxApodization.includes(channelIndex);
       }
     };
-    
+
     // Render the table
     return (
-      <Box sx={{ width: '100%', border: '0px solid #e0e0e0', borderRadius: 1, overflow: 'hidden' }}>
+      <Box
+        sx={{
+          width: '100%',
+          border: '0px solid #e0e0e0',
+          borderRadius: 1,
+          overflow: 'hidden',
+        }}
+      >
         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
           {/* Generate table rows */}
           {Array.from({ length: ROWS }, (_, row) => (
@@ -428,9 +435,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 const isHeaderCell = row === 0 || col === 0;
                 const channelIndex = (row - 1) * 16 + (col - 1);
                 const isValidChannel = channelIndex < 64;
-                
+
                 // Determine cell content and styling
-                const cellContent = isHeaderCell ? '✔' : (isValidChannel ? channelIndex : null);
+                const cellContent = isHeaderCell
+                  ? '✔'
+                  : isValidChannel
+                    ? channelIndex
+                    : null;
                 const cellSx = {
                   width: col === 0 ? '40px' : '32px',
                   height: row === 0 ? '32px' : '32px',
@@ -442,7 +453,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   fontSize: '0.7rem',
                   fontWeight: isHeaderCell ? 'normal' : 'normal',
                 };
-                
+
                 // Apply different styles for header cells vs data cells
                 if (isHeaderCell) {
                   // Header cells (first row and first column) use circle indicators
@@ -451,7 +462,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     color: isSelected ? '#007bff' : '#9e9e9e',
                     '&:hover': {
                       backgroundColor: isValidChannel ? '#e0e0e0' : '#f5f5f5',
-                      color: isValidChannel ? (isSelected ? '#0056b3' : '#757575') : '#9e9e9e',
+                      color: isValidChannel
+                        ? isSelected
+                          ? '#0056b3'
+                          : '#757575'
+                        : '#9e9e9e',
                     },
                   });
                 } else {
@@ -460,14 +475,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     backgroundColor: isSelected ? '#007bff' : '#f5f5f5',
                     color: isSelected ? 'white' : 'inherit',
                     '&:hover': {
-                      backgroundColor: isValidChannel ? (isSelected ? '#0056b3' : '#e0e0e0') : '#f5f5f5',
+                      backgroundColor: isValidChannel
+                        ? isSelected
+                          ? '#0056b3'
+                          : '#e0e0e0'
+                        : '#f5f5f5',
                     },
                   });
                 }
-                
+
                 return (
                   <Box
-                    style={{width: '100%'}}
+                    style={{ width: '100%' }}
                     key={`${row}-${col}`}
                     sx={cellSx}
                     onClick={() => isValidChannel && handleCellClick(row, col)}
@@ -726,19 +745,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* rx Apodization Control */}
             <LabelCell label="RX Apodization" />
             <TableCell sx={{ verticalAlign: 'top', pt: 2 }}>
-
-            <Box sx={{ mt: 0, mb: 1 }}>
-              <Box sx={{ pl: 0 }}>
-                {generateRxApodizationTable()}
+              <Box sx={{ mt: 0, mb: 1 }}>
+                <Box sx={{ pl: 0 }}>{generateRxApodizationTable()}</Box>
               </Box>
-            </Box>
             </TableCell>
           </TableRow>
-
         </TableBody>
       </Table>
-
-
     </Box>
   );
 };
